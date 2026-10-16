@@ -196,12 +196,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
       await _storage.saveUser(user);
       await _storage.setOnboarded(true);
-      invalidateUserData();
       state = state.copyWith(
         isAuthenticated: true,
         isSubmitting: false,
         user: user,
       );
+      invalidateUserData();
+      final ref = _ref;
+      if (ref != null) {
+        ref.read(semestersProvider.notifier).loadSemesters();
+      }
       return true;
     } catch (e) {
       String msg = 'Invalid email or password.';
@@ -258,12 +262,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
       await _storage.saveUser(user);
       await _storage.setOnboarded(true);
-      invalidateUserData();
       state = state.copyWith(
         isAuthenticated: true,
         isSubmitting: false,
         user: user,
       );
+      invalidateUserData();
+      final ref = _ref;
+      if (ref != null) {
+        ref.read(semestersProvider.notifier).loadSemesters();
+      }
       return true;
     } catch (e) {
       String msg = 'Registration failed. Please check your information.';
@@ -347,21 +355,45 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
       await _storage.saveUser(user);
       await _storage.setOnboarded(true);
-      invalidateUserData();
       state = state.copyWith(
         isAuthenticated: true,
         isGoogleLoading: false,
         user: user,
       );
+      invalidateUserData();
+      final ref = _ref;
+      if (ref != null) {
+        ref.read(semestersProvider.notifier).loadSemesters();
+      }
       return true;
     } on PlatformException catch (pEx, st) {
-      debugPrint('[Google Auth PlatformException] ${pEx.code}: ${pEx.message}\n$st');
-      String msg = pEx.message ?? 'Google Sign-In is unavailable on this device platform (${pEx.code}).';
-      if (pEx.code == 'popup_closed_by_user') {
-        msg = 'Google Sign-In was cancelled.';
-      } else if (pEx.code.contains('unregistered_origin') || (pEx.message ?? '').contains('unregistered_origin')) {
-        msg = 'Google Sign-In: Current origin/port is not authorized in Google Cloud Console. Add this localhost port to Authorized JavaScript Origins.';
+      if (kDebugMode) {
+        debugPrint('[Google Auth PlatformException] ${pEx.code}: ${pEx.message}\n$st');
       }
+      String msg = 'Google Sign-In is unavailable on this device platform (${pEx.code}).';
+      final pExMsg = pEx.message ?? '';
+
+      if (pEx.code == 'popup_closed_by_user' ||
+          pEx.code == 'sign_in_canceled' ||
+          pExMsg.toLowerCase().contains('canceled') ||
+          pExMsg.toLowerCase().contains('cancelled')) {
+        msg = 'Google Sign-In was cancelled.';
+      } else if (pEx.code.contains('unregistered_origin') || pExMsg.contains('unregistered_origin')) {
+        msg = 'Google Sign-In: Current origin/port is not authorized in Google Cloud Console. Add this localhost port to Authorized JavaScript Origins.';
+      } else if (pEx.code == 'sign_in_failed' ||
+          pExMsg.contains('10') ||
+          pExMsg.contains('s0.d') ||
+          pExMsg.contains('DEVELOPER_ERROR') ||
+          pExMsg.contains('ApiException: 10')) {
+        msg = 'Google Sign-In setup error (Developer Error 10): This APK\'s signing certificate (SHA-1) is not registered in Google Cloud Console for com.attendhub.attendhub.';
+      } else if (pExMsg.contains('7') || pExMsg.toLowerCase().contains('network_error')) {
+        msg = 'Network error during Google Sign-In. Please check your internet connection.';
+      } else if (pExMsg.startsWith('s0.') || pExMsg.contains('ApiException')) {
+        msg = 'Google Sign-In failed (${pEx.code}). Please verify Google Play Services.';
+      } else if (pExMsg.isNotEmpty) {
+        msg = pExMsg;
+      }
+
       state = state.copyWith(
         isAuthenticated: false,
         isGoogleLoading: false,
@@ -369,7 +401,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
       return false;
     } catch (e, st) {
-      debugPrint('[Google Auth Error] $e\n$st');
+      if (kDebugMode) {
+        debugPrint('[Google Auth Error] $e\n$st');
+      }
       String msg = 'Google authentication failed.';
       if (e is DioException) {
         if (e.response?.data is Map && e.response?.data['detail'] != null) {
@@ -383,10 +417,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
         }
       } else {
         final errStr = e.toString().replaceAll('Exception:', '').trim();
-        if (errStr.contains('unregistered_origin')) {
+        if (errStr.contains('DOMException') ||
+            errStr.contains('AbortError') ||
+            errStr.contains('popup_closed') ||
+            errStr.contains('user cancelled')) {
+          msg = 'Google Sign-In was cancelled or closed.';
+        } else if (errStr.contains('unregistered_origin')) {
           msg = 'Google Sign-In: Current origin/port is not authorized in Google Cloud Console. Add this localhost port to Authorized JavaScript Origins.';
-        } else if (errStr.contains('popup_closed') || errStr.contains('user cancelled')) {
-          msg = 'Google Sign-In was cancelled.';
+        } else if (errStr.contains('10') || errStr.contains('s0.d')) {
+          msg = 'Google Sign-In setup error (Developer Error 10): This APK\'s signing certificate (SHA-1) is not registered in Google Cloud Console for com.attendhub.attendhub.';
         } else {
           msg = errStr.isNotEmpty ? 'Google Sign-In: $errStr' : 'Google authentication failed.';
         }
@@ -402,11 +441,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> logout() async {
     try {
-      await _client.dio.post(ApiEndpoints.logout);
+      await _client.dio.post(ApiEndpoints.logout).timeout(const Duration(seconds: 2));
     } catch (_) {}
     try {
-      await _cachedGoogleSignIn?.signOut();
+      await _cachedGoogleSignIn?.signOut().timeout(const Duration(seconds: 1));
     } catch (_) {}
+    _cachedGoogleSignIn = null;
     await _storage.clearAuth();
     await _storage.clearSemesterCache();
     state = AuthState(isAuthenticated: false, isInitialChecking: false);
@@ -414,7 +454,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
     if (ref != null) {
       ref.read(semestersProvider.notifier).clear();
     }
-    invalidateUserData();
   }
 }
 

@@ -17,14 +17,14 @@ import '../setup/academic_setup_screen.dart';
 
 class HolidaysScreen extends ConsumerWidget {
   final VoidCallback onOpenDrawer;
-  final VoidCallback onNavigateToCalendar;
+  final VoidCallback? onNavigateToCalendar;
   final VoidCallback? onNavigateToProfile;
   final VoidCallback? onOpenSetup;
 
   const HolidaysScreen({
     super.key,
     required this.onOpenDrawer,
-    required this.onNavigateToCalendar,
+    this.onNavigateToCalendar,
     this.onNavigateToProfile,
     this.onOpenSetup,
   });
@@ -367,12 +367,12 @@ class HolidaysScreen extends ConsumerWidget {
 
             // Upcoming Holidays Section
             if (state.filterType != 'past') ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Expanded(
+                    Expanded(
                       child: Row(
                         children: [
                           Icon(Icons.event_available_outlined,
@@ -387,17 +387,6 @@ class HolidaysScreen extends ConsumerWidget {
                             ),
                           ),
                         ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    GestureDetector(
-                      onTap: onNavigateToCalendar,
-                      child: Text(
-                        'View Calendar >',
-                        style: AppTypography.bodySmall.copyWith(
-                          color: AppColors.terracotta,
-                          fontWeight: FontWeight.w600,
-                        ),
                       ),
                     ),
                   ],

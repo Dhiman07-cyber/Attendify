@@ -445,9 +445,9 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
               children: [
                 // Overall Ring
                 Expanded(
-                  flex: 3,
+                  flex: 6,
                   child: LiquidGlassCard(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(12),
                     child: AttendanceProgressRing(
                       percentage: data.overallPercentage,
                       attended: data.totalAttended,
@@ -455,18 +455,18 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
                       targetPercentage: data.personalTarget,
                       minimumPercentage: data.minimumRequirement,
                       trendChange: data.monthOverMonthChange,
-                      size: 105,
+                      size: 100,
                     ),
                   ),
                 ),
 
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
 
                 // Dynamic Status Card (stretched to match height)
                 Expanded(
-                  flex: 2,
+                  flex: 5,
                   child: LiquidGlassCard(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -475,8 +475,8 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Container(
-                              width: 36,
-                              height: 36,
+                              width: 32,
+                              height: 32,
                               decoration: BoxDecoration(
                                 color: hasNoData
                                     ? AppColors.sandLight
@@ -491,7 +491,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
                                     : isOnTrack
                                         ? Icons.track_changes_rounded
                                         : Icons.warning_amber_rounded,
-                                size: 20,
+                                size: 18,
                                 color: hasNoData
                                     ? AppColors.inkMuted
                                     : isOnTrack
@@ -499,7 +499,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
                                         : AppColors.coral,
                               ),
                             ),
-                            const SizedBox(height: 10),
+                            const SizedBox(height: 8),
                             Text(
                               hasNoData
                                   ? 'No records yet'
@@ -508,29 +508,31 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
                                       : 'Below target',
                               style: TextStyle(
                                   fontWeight: FontWeight.w700,
-                                  fontSize: 13,
+                                  fontSize: 12.5,
                                   color: hasNoData
                                       ? AppColors.ink
                                       : isOnTrack
                                           ? AppColors.sageDark
                                           : AppColors.coral),
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 3),
                             Text(
                               hasNoData
                                   ? 'Mark classes to start tracking attendance.'
                                   : isOnTrack
-                                      ? 'Keep attending regularly to stay above 75% for all subjects.'
+                                      ? 'Attend regularly to stay above 75% in all subjects.'
                                       : 'Attend upcoming classes to recover to target.',
                               style: AppTypography.bodySmall
-                                  .copyWith(fontSize: 11, height: 1.3),
+                                  .copyWith(fontSize: 10.5, height: 1.25),
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),
                         if (!hasNoData)
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 6),
+                                horizontal: 8, vertical: 5),
                             decoration: BoxDecoration(
                               color: (isOnTrack
                                       ? AppColors.sageLight
@@ -539,6 +541,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Row(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
                                   isOnTrack
@@ -550,18 +553,21 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
                                       : AppColors.coral,
                                 ),
                                 const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    isOnTrack
-                                        ? 'All subjects safe'
-                                        : 'Attention needed',
-                                    style: TextStyle(
-                                        fontSize: 9.5,
-                                        fontWeight: FontWeight.w700,
-                                        color: isOnTrack
-                                            ? AppColors.sageDark
-                                            : AppColors.coral),
-                                    overflow: TextOverflow.ellipsis,
+                                Flexible(
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      isOnTrack
+                                          ? 'All subjects safe'
+                                          : 'Attention needed',
+                                      style: TextStyle(
+                                          fontSize: 9.5,
+                                          fontWeight: FontWeight.w700,
+                                          color: isOnTrack
+                                              ? AppColors.sageDark
+                                              : AppColors.coral),
+                                    ),
                                   ),
                                 ),
                               ],
@@ -1727,12 +1733,15 @@ class _AnalyticsTrendPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (size.width <= 0 || size.height <= 0) return;
+
     final validPoints = trends
-        .where((t) => t.percentage != null)
+        .where((t) => t.percentage != null && !t.percentage!.isNaN)
         .map((t) => (t.percentage! / 100.0).clamp(0.0, 1.0))
         .toList();
 
-    final targetThreshold = (targetPercentage / 100.0).clamp(0.0, 1.0);
+    final safeTarget = targetPercentage.isNaN ? 75.0 : targetPercentage;
+    final targetThreshold = (safeTarget / 100.0).clamp(0.0, 1.0);
     final targetY = size.height * (1.0 - targetThreshold);
 
     final dotted = Paint()
@@ -1750,11 +1759,13 @@ class _AnalyticsTrendPainter extends CustomPainter {
     // Text: Target (75%)
     final tp = TextPainter(
       text: TextSpan(
-          text: 'Target (${targetPercentage.toStringAsFixed(0)}%)',
+          text: 'Target (${safeTarget.toStringAsFixed(0)}%)',
           style: const TextStyle(color: AppColors.inkMuted, fontSize: 10)),
       textDirection: TextDirection.ltr,
     )..layout();
-    tp.paint(canvas, Offset(size.width - 70, targetY - 14));
+    if (size.width >= 70) {
+      tp.paint(canvas, Offset(size.width - 70, targetY - 14));
+    }
 
     if (validPoints.length < 2) {
       final noDataTp = TextPainter(
@@ -1814,8 +1825,10 @@ class _AnalyticsTrendPainter extends CustomPainter {
             prevX + (x - prevX) / 2, prevY, prevX + (x - prevX) / 2, y, x, y);
       }
 
-      canvas.drawCircle(Offset(x, y), 4, Paint()..color = Colors.white);
-      canvas.drawCircle(Offset(x, y), 2.5, Paint()..color = AppColors.coral);
+      if (!x.isNaN && !y.isNaN) {
+        canvas.drawCircle(Offset(x, y), 4, Paint()..color = Colors.white);
+        canvas.drawCircle(Offset(x, y), 2.5, Paint()..color = AppColors.coral);
+      }
     }
 
     fillPath.lineTo(size.width, size.height);

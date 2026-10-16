@@ -8,12 +8,12 @@ class AppConfig {
   );
 
   /// Google OAuth Web/Server Client ID used for requesting backend ID tokens.
-  /// Injected at compile/build time from environment; never hardcoded.
+  /// Injected at compile/build time from environment; with safe production fallback.
   static const String googleServerClientId = String.fromEnvironment(
     'GOOGLE_SERVER_CLIENT_ID',
     defaultValue: String.fromEnvironment(
       'GOOGLE_CLIENT_ID',
-      defaultValue: '',
+      defaultValue: '116527451867-n5nghihimlb6t326l6hgf13ch4ad83uh.apps.googleusercontent.com',
     ),
   );
 

@@ -81,7 +81,14 @@ from fastapi.exceptions import RequestValidationError
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    logger.warning(f"Validation error on {request.method} {request.url}: {exc.errors()}")
+    sanitized_errors = []
+    for err in exc.errors():
+        err_copy = dict(err)
+        if "input" in err_copy and isinstance(err_copy.get("loc"), (list, tuple)):
+            if any("password" in str(loc).lower() for loc in err_copy["loc"]):
+                err_copy["input"] = "[REDACTED]"
+        sanitized_errors.append(err_copy)
+    logger.warning(f"Validation error on {request.method} {request.url}: {sanitized_errors}")
     origin = request.headers.get("origin")
     response = JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

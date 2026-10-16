@@ -352,21 +352,22 @@ void main() {
       await tester.tap(find.text('Software Engineering').last);
       await tester.pumpAndSettle();
 
-      // Verify Option 2: Select Class Type (Theory vs Practical / Lab)
+      // Verify Option 2: Select Class Type (Theory vs Lab vs Others)
       expect(find.text('2. Select Class Type'), findsOneWidget);
       expect(find.text('Theory'), findsWidgets);
-      expect(find.text('Practical / Lab'), findsWidgets);
-      expect(find.text('Default: 1 Hour'), findsOneWidget);
-      expect(find.text('Default: 2 Hours'), findsOneWidget);
+      expect(find.text('Lab'), findsWidgets);
+      expect(find.text('Others'), findsWidgets);
+      expect(find.text('1 Hour'), findsWidgets);
+      expect(find.text('2 Hours'), findsOneWidget);
 
       // Verify Option 3: Side-by-side Timings
       expect(find.text('3. Class Timings'), findsOneWidget);
       expect(find.text('Start Time'), findsOneWidget);
       expect(find.text('End Time'), findsOneWidget);
 
-      // Select Practical / Lab (2 hr duration)
-      await tester.ensureVisible(find.text('Practical / Lab'));
-      await tester.tap(find.text('Practical / Lab'));
+      // Select Lab (2 hr duration)
+      await tester.ensureVisible(find.text('Lab'));
+      await tester.tap(find.text('Lab'));
       await tester.pumpAndSettle();
       expect(find.descendant(of: find.byType(BottomSheet), matching: find.byIcon(Icons.close_rounded)), findsOneWidget);
 
@@ -648,10 +649,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Schedule Class'), findsOneWidget);
 
-      // 3. User attempts to pick 'Practical / Lab' (Default: 2 Hours, 9 AM - 11 AM)
+      // 3. User attempts to pick 'Lab' (Default: 2 Hours, 9 AM - 11 AM)
       // Since Box 2 (10 AM) already holds 'Theory Sub A', booking 2 hours would collide with Box 2!
-      await tester.ensureVisible(find.text('Practical / Lab'));
-      await tester.tap(find.text('Practical / Lab'));
+      await tester.ensureVisible(find.text('Lab'));
+      await tester.tap(find.text('Lab'));
       await tester.pumpAndSettle();
 
       // Expect conflict toast to be displayed explaining that 'Theory Sub A' is already booked at 10:00
@@ -993,5 +994,40 @@ void main() {
         expect(tester.takeException(), isNull);
       });
     }
+  });
+
+  group('Academic Setup Invariant Tests (Sunday & Holidays Naming)', () {
+    testWidgets('AcademicSetupScreen Step 2 excludes Sunday from working days and Step 5 is Holidays', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: AppTheme.lightTheme,
+            home: AcademicSetupScreen(
+              onComplete: () {},
+              onCancel: () {},
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Go to Step 2 via step pill
+      await tester.tap(find.byKey(const Key('step_segment_1')));
+      await tester.pumpAndSettle();
+
+      // Verify Sunday is not among working day options
+      expect(find.text('Sunday'), findsNothing);
+      expect(find.text('Monday (Default)'), findsOneWidget);
+      expect(find.text('Saturday (Default)'), findsOneWidget);
+
+      // Verify Step 5 pill is named 'Holidays'
+      expect(find.byKey(const Key('step_segment_4')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('step_segment_4')));
+      await tester.pumpAndSettle();
+
+      // Step title & subtitle
+      expect(find.text('Academic Holidays'), findsOneWidget);
+      expect(find.text('Add Event'), findsAtLeastNWidgets(1));
+    });
   });
 }

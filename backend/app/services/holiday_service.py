@@ -84,9 +84,15 @@ async def create_holiday(db: AsyncSession, user_id: str, data: HolidayCreate) ->
     if data.end_date < data.start_date:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="End date cannot be earlier than start date.")
 
+    sem_id = data.semester_id
+    if not sem_id:
+        active_sem = await get_active_semester(db, user_id)
+        if active_sem:
+            sem_id = active_sem.id
+
     hol = Holiday(
         user_id=user_id,
-        semester_id=data.semester_id,
+        semester_id=sem_id,
         start_date=data.start_date,
         end_date=data.end_date,
         title=data.title.strip(),

@@ -42,7 +42,6 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
     'Thursday',
     'Friday',
     'Saturday',
-    'Sunday',
   ];
 
   @override
@@ -52,30 +51,48 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
   }
 
   List<String> _getScheduleDays(TodayState state) {
+    final activeSem = ref.watch(semestersProvider).activeSemester;
+    if (activeSem != null && activeSem.workingDays.isNotEmpty) {
+      final days = activeSem.workingDays
+          .where((i) => i >= 0 && i < _allDays.length)
+          .map((i) => _allDays[i])
+          .toList();
+      if (days.isNotEmpty) return days;
+    }
     final sIdx = _allDays.indexOf(state.startDay);
     final eIdx = _allDays.indexOf(state.endDay);
     if (sIdx != -1 && eIdx != -1 && sIdx <= eIdx) {
       return _allDays.sublist(sIdx, eIdx + 1);
     }
-    return const ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    return const ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
   }
 
   List<int> _getScheduleHours(TodayState state) {
-    if (state.classStartHour >= state.classEndHour) {
+    final activeSem = ref.watch(semestersProvider).activeSemester;
+    int startH = activeSem?.classStartHour ?? state.classStartHour;
+    int endH = activeSem?.classEndHour ?? state.classEndHour;
+    for (final e in state.timetableEntries) {
+      final st = _parseHour(e['start_time'] as String?);
+      final et = _parseHour(e['end_time'] as String?);
+      if (st != null && st < startH) startH = st;
+      if (et != null && et > endH) endH = et;
+    }
+    if (startH >= endH) {
       return const [9, 10, 11, 12, 13, 14, 15, 16];
     }
     return List.generate(
-      (state.classEndHour - state.classStartHour).clamp(1, 14),
-      (i) => state.classStartHour + i,
+      (endH - startH).clamp(1, 16),
+      (i) => startH + i,
     );
   }
 
   String _normalizeClassType(dynamic raw) {
-    if (raw == null) return 'Others';
+    if (raw == null) return 'Theory';
     final s = raw.toString().trim().toUpperCase();
-    if (s == 'LAB') return 'Lab';
+    if (s == 'LAB' || s.contains('LAB') || s.contains('PRACTICAL')) return 'Lab';
+    if (s == 'OTHER' || s.contains('OTHER') || s == 'UNSPECIFIED') return 'Others';
     if (s == 'THEORY') return 'Theory';
-    return 'Others';
+    return 'Theory';
   }
 
   String _formatHourDisplay(int hour, {bool is24h = false}) {
@@ -896,11 +913,13 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
 
         // Hero Spotlight Card (Time-Aware Live / Next Class)
         if (state.weekOffset == 0) ...[
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: _buildHeroSpotlightCard(context, state, activeDays, currentDayIdx, currentHour),
-          ),
-          const SizedBox(height: 14),
+          if (_buildHeroSpotlightCard(context, state, activeDays, currentDayIdx, currentHour) case final heroCard?) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: heroCard,
+            ),
+            const SizedBox(height: 14),
+          ],
         ],
 
         // Section Title & Routine Subtitle
@@ -1444,7 +1463,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
     );
   }
 
-  Widget _buildHeroSpotlightCard(
+  Widget? _buildHeroSpotlightCard(
     BuildContext context,
     TodayState state,
     List<String> activeDays,
@@ -1613,22 +1632,8 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
       );
     }
 
-    // No classes scheduled today / Weekend
-    return const LiquidGlassCard(
-      padding: EdgeInsets.all(14),
-      child: Row(
-        children: [
-          Icon(Icons.done_all_rounded, color: AppColors.sageDark, size: 20),
-          SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              'No more classes scheduled for today. Check the weekly routine grid below.',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.inkMuted),
-            ),
-          ),
-        ],
-      ),
-    );
+    // No active or upcoming classes scheduled today: return null so no card is rendered
+    return null;
   }
 
   Widget _buildLegendChip(Color color, String label) {

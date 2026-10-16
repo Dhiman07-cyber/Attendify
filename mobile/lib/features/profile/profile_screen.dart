@@ -33,6 +33,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   late TextEditingController _editController;
   late FocusNode _editFocusNode;
   bool _isSaving = false;
+  bool _isLoggingOut = false;
 
   @override
   void initState() {
@@ -677,7 +678,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           padding: const EdgeInsets.symmetric(vertical: 11),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
-                        icon: const Icon(Icons.auto_awesome_rounded, size: 16),
+                        icon: const Icon(Icons.school_rounded, size: 17),
                         label: const Text(
                           'Open Academic Setup',
                           style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
@@ -832,9 +833,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
               // 6. Logout Button
               InkWell(
-                onTap: () {
-                  ref.read(authProvider.notifier).logout();
-                },
+                onTap: _isLoggingOut
+                    ? null
+                    : () async {
+                        setState(() => _isLoggingOut = true);
+                        try {
+                          await ref.read(authProvider.notifier).logout();
+                        } finally {
+                          if (mounted) {
+                            setState(() => _isLoggingOut = false);
+                          }
+                        }
+                      },
                 borderRadius: BorderRadius.circular(18),
                 child: Container(
                   width: double.infinity,
@@ -845,20 +855,40 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     border: Border.all(
                         color: AppColors.coral.withValues(alpha: 0.3)),
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.logout_rounded,
-                          color: AppColors.coral, size: 20),
-                      SizedBox(width: 8),
-                      Text(
-                        'Logout',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.coral,
+                      if (_isLoggingOut) ...[
+                        const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.coral),
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 10),
+                        const Text(
+                          'Logging out...',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.coral,
+                          ),
+                        ),
+                      ] else ...[
+                        const Icon(Icons.logout_rounded,
+                            color: AppColors.coral, size: 20),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Logout',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.coral,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

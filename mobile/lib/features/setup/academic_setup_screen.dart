@@ -20,6 +20,7 @@ import '../analytics/providers/analytics_provider.dart';
 import '../holidays/providers/holidays_provider.dart';
 import '../profile/providers/profile_provider.dart';
 import '../../shared/providers/semesters_provider.dart';
+import '../../core/theme/time_format_provider.dart';
 import 'providers/setup_provider.dart';
 
 class AcademicSetupScreen extends ConsumerStatefulWidget {
@@ -37,10 +38,12 @@ class AcademicSetupScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<AcademicSetupScreen> createState() => _AcademicSetupScreenState();
+  ConsumerState<AcademicSetupScreen> createState() =>
+      _AcademicSetupScreenState();
 }
 
-class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with WidgetsBindingObserver {
+class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen>
+    with WidgetsBindingObserver {
   final LocalStorage _storage = LocalStorage();
   final PageController _pageController = PageController(keepPage: false);
   int _currentStep = 0;
@@ -86,9 +89,10 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
   final _routineStartCtrl = TextEditingController(text: '09:00');
   final _routineEndCtrl = TextEditingController(text: '10:00');
   final _routineRoomCtrl = TextEditingController();
-  String? _quickAssignTool; // null = no tool selected, 'Break Time' = break, 'subject_name' = subject
+  String?
+      _quickAssignTool; // null = no tool selected, 'Break Time' = break, 'subject_name' = subject
   int _classStartHour = 9; // 09:00 AM (default)
-  int _classEndHour = 16;  // 04:00 PM (default)
+  int _classEndHour = 16; // 04:00 PM (default)
   String _startDay = 'Monday'; // Default Monday
   String _endDay = 'Saturday'; // Default Saturday
   final ScrollController _timetableScrollCtrl = ScrollController();
@@ -100,14 +104,14 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
     'Thursday',
     'Friday',
     'Saturday',
-    'Sunday',
   ];
 
-  String get _weeklyScheduleType => (_startDay == 'Monday' && _endDay == 'Saturday')
-      ? 'mon_sat'
-      : (_startDay == 'Monday' && _endDay == 'Friday')
-          ? 'mon_fri'
-          : 'custom';
+  String get _weeklyScheduleType =>
+      (_startDay == 'Monday' && _endDay == 'Saturday')
+          ? 'mon_sat'
+          : (_startDay == 'Monday' && _endDay == 'Friday')
+              ? 'mon_fri'
+              : 'custom';
 
   List<int> get _scheduleHours => List.generate(
         (_classEndHour - _classStartHour).clamp(1, 14),
@@ -120,7 +124,14 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
     if (sIdx != -1 && eIdx != -1 && sIdx <= eIdx) {
       return _allDays.sublist(sIdx, eIdx + 1);
     }
-    return const ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    return const [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday'
+    ];
   }
 
   String _formatHourString(int hour) {
@@ -236,23 +247,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
     return null;
   }
 
-  // Step 5: Holidays Drafts
-  final List<Map<String, dynamic>> _holidays = [
-    {
-      'title': 'Diwali Break',
-      'start_date': DateTime(2026, 11, 4),
-      'end_date': DateTime(2026, 11, 6),
-      'category': 'Festival',
-      'notes': 'University holiday',
-    },
-    {
-      'title': 'Mid-Term Break',
-      'start_date': DateTime(2026, 10, 21),
-      'end_date': DateTime(2026, 10, 25),
-      'category': 'Semester Break',
-      'notes': 'Autumn recess',
-    },
-  ];
+  // Step 5: Holidays Drafts (empty by default; populated from DB or user input)
+  final List<Map<String, dynamic>> _holidays = [];
   final _holidayTitleCtrl = TextEditingController();
   DateTime _holidayStartDate = DateTime.now().add(const Duration(days: 14));
   DateTime _holidayEndDate = DateTime.now().add(const Duration(days: 15));
@@ -276,7 +272,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
   final Map<String, TextEditingController> _attendedControllers = {};
   final Map<String, TextEditingController> _conductedControllers = {};
 
-  TextEditingController _getAttendedController(String subjectName, int currentVal) {
+  TextEditingController _getAttendedController(
+      String subjectName, int currentVal) {
     var ctrl = _attendedControllers[subjectName];
     if (ctrl == null) {
       ctrl = TextEditingController(text: currentVal.toString());
@@ -290,7 +287,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
     return ctrl;
   }
 
-  TextEditingController _getConductedController(String subjectName, int currentVal) {
+  TextEditingController _getConductedController(
+      String subjectName, int currentVal) {
     var ctrl = _conductedControllers[subjectName];
     if (ctrl == null) {
       ctrl = TextEditingController(text: currentVal.toString());
@@ -306,7 +304,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
 
   bool _isSubmitting = false;
   String? _errorMessage;
-  bool _isRestoringDraft = false;
+  int _restoringDraftCount = 0;
+  bool get _isRestoringDraft => _restoringDraftCount > 0;
 
   Timer? _debounceSaveTimer;
 
@@ -365,7 +364,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
       _semesterNumber = widget.initialSemesterNumber!;
       _semesterLabelCtrl.text = _formatSemesterLabel(_semesterNumber);
     } else {
-      final activeSemNum = ref.read(semestersProvider).activeSemester?.semesterNumber;
+      final activeSemNum =
+          ref.read(semestersProvider).activeSemester?.semesterNumber;
       if (activeSemNum != null) {
         _semesterNumber = activeSemNum;
         _semesterLabelCtrl.text = _formatSemesterLabel(activeSemNum);
@@ -374,7 +374,7 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
     _attachListeners();
     // Prefill full name from Auth, fetch database baseline, and restore user's local draft
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      _isRestoringDraft = true;
+      _restoringDraftCount++;
       try {
         try {
           final user = ref.read(authProvider).user;
@@ -386,7 +386,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
         // 1. Fetch server baseline state first
         final auth = ref.read(authProvider);
         if (auth.isAuthenticated && auth.user != null) {
-          await _fetchDatabaseSetupData(targetSemester: widget.initialSemesterNumber);
+          await _fetchDatabaseSetupData(
+              targetSemester: widget.initialSemesterNumber);
         }
 
         // 2. Load uncommitted draft from local storage AFTER database fetch
@@ -403,21 +404,24 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
             }
           } catch (_) {}
         }
-        if (_subjects.isNotEmpty && _selectedRoutineSubject == null && mounted) {
+        if (_subjects.isNotEmpty &&
+            _selectedRoutineSubject == null &&
+            mounted) {
           setState(() {
             _selectedRoutineSubject = _subjects[0]['name'] as String;
           });
         }
         _syncPageToCurrentStep();
       } finally {
-        _isRestoringDraft = false;
+        _restoringDraftCount--;
       }
     });
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
       _saveDraft(immediate: true);
     }
   }
@@ -493,42 +497,50 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
       'end_day': _endDay,
       'weekly_schedule_type': _weeklyScheduleType,
       // Step 3
-      'subjects': _subjects.map((s) => {
-        'name': s['name'],
-        'code': s['code'],
-        'faculty': s['faculty'],
-        'color': s['color'] ?? '#C96E5B',
-      }).toList(),
+      'subjects': _subjects
+          .map((s) => {
+                'name': s['name'],
+                'code': s['code'],
+                'faculty': s['faculty'],
+                'color': s['color'] ?? '#C96E5B',
+              })
+          .toList(),
       'new_sub_name': _newSubNameCtrl.text,
       'new_sub_code': _newSubCodeCtrl.text,
       'new_sub_faculty': _newSubFacultyCtrl.text,
       // Step 4
-      'timetable_entries': _timetableEntries.map((t) => {
-        'subject_name': t['subject_name'],
-        'day_of_week': t['day_of_week'],
-        'start_time': t['start_time'],
-        'end_time': t['end_time'],
-        'room': t['room'],
-        'class_type': t['class_type'] ?? 'Theory',
-        'faculty_name': t['faculty_name'],
-      }).toList(),
+      'timetable_entries': _timetableEntries
+          .map((t) => {
+                'subject_name': t['subject_name'],
+                'day_of_week': t['day_of_week'],
+                'start_time': t['start_time'],
+                'end_time': t['end_time'],
+                'room': t['room'],
+                'class_type': t['class_type'] ?? 'Theory',
+                'faculty_name': t['faculty_name'],
+              })
+          .toList(),
       'routine_day_of_week': _routineDayOfWeek,
       'routine_start': _routineStartCtrl.text,
       'routine_end': _routineEndCtrl.text,
       'routine_room': _routineRoomCtrl.text,
       'selected_routine_subject': _selectedRoutineSubject,
       // Step 5
-      'holidays': _holidays.map((h) => {
-        'title': h['title'],
-        'start_date': h['start_date'] is DateTime
-            ? (h['start_date'] as DateTime).toIso8601String()
-            : (h['start_date']?.toString() ?? DateTime.now().toIso8601String()),
-        'end_date': h['end_date'] is DateTime
-            ? (h['end_date'] as DateTime).toIso8601String()
-            : (h['end_date']?.toString() ?? DateTime.now().toIso8601String()),
-        'category': h['category'],
-        'notes': h['notes'],
-      }).toList(),
+      'holidays': _holidays
+          .map((h) => {
+                'title': h['title'],
+                'start_date': h['start_date'] is DateTime
+                    ? (h['start_date'] as DateTime).toIso8601String()
+                    : (h['start_date']?.toString() ??
+                        DateTime.now().toIso8601String()),
+                'end_date': h['end_date'] is DateTime
+                    ? (h['end_date'] as DateTime).toIso8601String()
+                    : (h['end_date']?.toString() ??
+                        DateTime.now().toIso8601String()),
+                'category': h['category'],
+                'notes': h['notes'],
+              })
+          .toList(),
       'holiday_title': _holidayTitleCtrl.text,
       'holiday_start_date': _holidayStartDate.toIso8601String(),
       'holiday_end_date': _holidayEndDate.toIso8601String(),
@@ -539,214 +551,266 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
   }
 
   void _restoreDraft(Map<String, dynamic> draft) {
-    _isRestoringDraft = true;
+    _restoringDraftCount++;
     try {
-      final step = draft['current_step'];
-    final maxStep = _isReturningUser ? 5 : 6;
-    if (step is int && step >= 0 && step <= maxStep) {
-      _currentStep = step;
-    }
-
-    // Step 1
-    if (draft['full_name'] is String) {
-      _fullNameCtrl.text = draft['full_name'] as String;
-    }
-    if (draft['university_name'] is String) {
-      _universityCtrl.text = draft['university_name'] as String;
-    }
-    if (draft['course_name'] is String) {
-      _courseCtrl.text = draft['course_name'] as String;
-    }
-    if (draft['student_id_number'] is String) {
-      _studentIdCtrl.text = draft['student_id_number'] as String;
-    }
-    if (draft['duration_years'] is int) {
-      _durationYears = draft['duration_years'] as int;
-    }
-    if (draft['session_start'] is int) {
-      _sessionStart = draft['session_start'] as int;
-    }
-    if (draft['session_end'] is int) {
-      _sessionEnd = draft['session_end'] as int;
-    }
-
-    // Step 2
-    if (draft['semester_number'] is int) {
-      _semesterNumber = draft['semester_number'] as int;
-    }
-    if (draft['semester_label'] is String) {
-      _semesterLabelCtrl.text = draft['semester_label'] as String;
-    }
-    if (draft['start_date'] is String) {
-      try {
-        _startDate = DateTime.parse(draft['start_date'] as String);
-      } catch (_) {}
-    }
-    if (draft['end_date'] is String) {
-      try {
-        _endDate = DateTime.parse(draft['end_date'] as String);
-      } catch (_) {}
-    }
-    if (draft['min_attendance'] != null) {
-      _minAttendance = (draft['min_attendance'] as num).toDouble();
-    }
-    if (draft['personal_target'] != null) {
-      _personalTarget = (draft['personal_target'] as num).toDouble();
-    }
-    if (draft['class_start_hour'] is int) {
-      _classStartHour = draft['class_start_hour'] as int;
-    }
-    if (draft['class_end_hour'] is int) {
-      _classEndHour = draft['class_end_hour'] as int;
-    }
-    if (draft['start_day'] is String && _allDays.contains(draft['start_day'])) {
-      _startDay = draft['start_day'] as String;
-    }
-    if (draft['end_day'] is String && _allDays.contains(draft['end_day'])) {
-      _endDay = draft['end_day'] as String;
-    } else if (draft['weekly_schedule_type'] is String) {
-      if (draft['weekly_schedule_type'] == 'mon_fri') {
-        _startDay = 'Monday';
-        _endDay = 'Friday';
-      } else {
-        _startDay = 'Monday';
-        _endDay = 'Saturday';
-      }
-    }
-
-    // Step 3
-    if (draft['subjects'] is List) {
-      _subjects.clear();
-      for (final item in draft['subjects'] as List) {
-        if (item is Map) {
-          _subjects.add({
-            'name': item['name'] ?? '',
-            'code': item['code'],
-            'faculty': item['faculty'],
-            'color': item['color'] ?? '#C96E5B',
-          });
+      if (!_isReturningUser && _availableSemesterNumbers.isEmpty) {
+        final step = draft['current_step'];
+        final maxStep = _isReturningUser ? 5 : 6;
+        if (step is int && step >= 0 && step <= maxStep) {
+          _currentStep = step;
         }
       }
-    }
-    if (draft['new_sub_name'] is String) {
-      _newSubNameCtrl.text = draft['new_sub_name'] as String;
-    }
-    if (draft['new_sub_code'] is String) {
-      _newSubCodeCtrl.text = draft['new_sub_code'] as String;
-    }
-    if (draft['new_sub_faculty'] is String) {
-      _newSubFacultyCtrl.text = draft['new_sub_faculty'] as String;
-    }
 
-    // Step 4
-    if (draft['timetable_entries'] is List) {
-      _timetableEntries.clear();
-      for (final item in draft['timetable_entries'] as List) {
-        if (item is Map) {
-          _timetableEntries.add({
-            'subject_name': item['subject_name'] ?? '',
-            'day_of_week': (item['day_of_week'] as num?)?.toInt() ?? 0,
-            'start_time': item['start_time'] ?? '09:00',
-            'end_time': item['end_time'] ?? '10:00',
-            'room': item['room'] ?? '',
-            'class_type': item['class_type'] ?? 'Theory',
-            'faculty_name': item['faculty_name'],
-          });
+      // Step 1
+      if (draft['full_name'] is String &&
+          (draft['full_name'] as String).isNotEmpty) {
+        _fullNameCtrl.text = draft['full_name'] as String;
+      }
+      if (draft['university_name'] is String &&
+          (draft['university_name'] as String).isNotEmpty) {
+        _universityCtrl.text = draft['university_name'] as String;
+      }
+      if (draft['course_name'] is String &&
+          (draft['course_name'] as String).isNotEmpty) {
+        _courseCtrl.text = draft['course_name'] as String;
+      }
+      if (draft['student_id_number'] is String &&
+          (draft['student_id_number'] as String).isNotEmpty) {
+        _studentIdCtrl.text = draft['student_id_number'] as String;
+      }
+      if (draft['duration_years'] is int) {
+        _durationYears = draft['duration_years'] as int;
+      }
+      if (draft['session_start'] is int) {
+        _sessionStart = draft['session_start'] as int;
+      }
+      if (draft['session_end'] is int) {
+        _sessionEnd = draft['session_end'] as int;
+      }
+
+      // Step 2
+      if (draft['semester_number'] is int) {
+        _semesterNumber = draft['semester_number'] as int;
+      }
+      if (draft['semester_label'] is String &&
+          (draft['semester_label'] as String).isNotEmpty) {
+        _semesterLabelCtrl.text = draft['semester_label'] as String;
+      }
+      if (draft['start_date'] is String) {
+        try {
+          _startDate = DateTime.parse(draft['start_date'] as String);
+        } catch (_) {}
+      }
+      if (draft['end_date'] is String) {
+        try {
+          _endDate = DateTime.parse(draft['end_date'] as String);
+        } catch (_) {}
+      }
+      if (draft['min_attendance'] != null) {
+        _minAttendance = (draft['min_attendance'] as num).toDouble();
+      }
+      if (draft['personal_target'] != null) {
+        _personalTarget = (draft['personal_target'] as num).toDouble();
+      }
+      if (draft['class_start_hour'] is int) {
+        _classStartHour = draft['class_start_hour'] as int;
+      }
+      if (draft['class_end_hour'] is int) {
+        _classEndHour = draft['class_end_hour'] as int;
+      }
+      if (draft['start_day'] is String &&
+          _allDays.contains(draft['start_day'])) {
+        _startDay = draft['start_day'] as String;
+      }
+      if (draft['end_day'] is String && _allDays.contains(draft['end_day'])) {
+        _endDay = draft['end_day'] as String;
+      } else if (draft['weekly_schedule_type'] is String) {
+        if (draft['weekly_schedule_type'] == 'mon_fri') {
+          _startDay = 'Monday';
+          _endDay = 'Friday';
+        } else {
+          _startDay = 'Monday';
+          _endDay = 'Saturday';
         }
       }
-    }
-    if (draft['routine_day_of_week'] is int) {
-      _routineDayOfWeek = draft['routine_day_of_week'] as int;
-    }
-    if (draft['routine_start'] is String) {
-      _routineStartCtrl.text = draft['routine_start'] as String;
-    }
-    if (draft['routine_end'] is String) {
-      _routineEndCtrl.text = draft['routine_end'] as String;
-    }
-    if (draft['routine_room'] is String) {
-      _routineRoomCtrl.text = draft['routine_room'] as String;
-    }
-    if (draft['selected_routine_subject'] is String) {
-      _selectedRoutineSubject = draft['selected_routine_subject'] as String;
-    }
 
-    // Step 5
-    if (draft['holidays'] is List) {
-      _holidays.clear();
-      for (final item in draft['holidays'] as List) {
-        if (item is Map) {
-          DateTime? sDate;
-          DateTime? eDate;
-          if (item['start_date'] is String) {
-            try {
-              sDate = DateTime.parse(item['start_date'] as String);
-            } catch (_) {}
-          }
-          if (item['end_date'] is String) {
-            try {
-              eDate = DateTime.parse(item['end_date'] as String);
-            } catch (_) {}
-          }
-          if (sDate != null && eDate != null) {
-            _holidays.add({
-              'title': item['title'] ?? 'Holiday',
-              'start_date': sDate,
-              'end_date': eDate,
-              'category': (item['category'] == 'Break') ? 'Semester Break' : (item['category'] ?? 'University Holiday'),
-              'notes': item['notes'],
+      // Step 3: Only restore subjects if draft contains non-empty subjects
+      if (draft['subjects'] is List && (draft['subjects'] as List).isNotEmpty) {
+        _subjects.clear();
+        for (final item in draft['subjects'] as List) {
+          if (item is Map) {
+            _subjects.add({
+              'name': item['name'] ?? '',
+              'code': item['code'],
+              'faculty': item['faculty'],
+              'color': item['color'] ?? '#C96E5B',
             });
           }
         }
       }
-    }
-    if (draft['holiday_title'] is String) {
-      _holidayTitleCtrl.text = draft['holiday_title'] as String;
-    }
-    if (draft['holiday_start_date'] is String) {
-      try {
-        _holidayStartDate = DateTime.parse(draft['holiday_start_date'] as String);
-      } catch (_) {}
-    }
-    if (draft['holiday_end_date'] is String) {
-      try {
-        _holidayEndDate = DateTime.parse(draft['holiday_end_date'] as String);
-      } catch (_) {}
-    }
+      if (draft['new_sub_name'] is String) {
+        _newSubNameCtrl.text = draft['new_sub_name'] as String;
+      }
+      if (draft['new_sub_code'] is String) {
+        _newSubCodeCtrl.text = draft['new_sub_code'] as String;
+      }
+      if (draft['new_sub_faculty'] is String) {
+        _newSubFacultyCtrl.text = draft['new_sub_faculty'] as String;
+      }
 
-    // Step 6
-    if (draft['starting_attended'] is Map) {
-      _startingAttended.clear();
-      (draft['starting_attended'] as Map).forEach((k, v) {
-        if (k is String && v is num) {
-          _startingAttended[k] = v.toInt();
+      // Step 4: Only restore timetable if draft contains non-empty entries
+      if (draft['timetable_entries'] is List &&
+          (draft['timetable_entries'] as List).isNotEmpty) {
+        _timetableEntries.clear();
+        for (final item in draft['timetable_entries'] as List) {
+          if (item is Map) {
+            final rawType =
+                (item['class_type'] as String?)?.toUpperCase() ?? 'THEORY';
+            final mappedType = (rawType == 'LAB' ||
+                    rawType.contains('LAB') ||
+                    rawType.contains('PRACTICAL'))
+                ? 'Lab'
+                : (rawType == 'UNSPECIFIED' || rawType.contains('OTHER'))
+                    ? 'Others'
+                    : 'Theory';
+            _timetableEntries.add({
+              'subject_name': item['subject_name'] ?? '',
+              'day_of_week': (item['day_of_week'] as num?)?.toInt() ?? 0,
+              'start_time': item['start_time'] ?? '09:00',
+              'end_time': item['end_time'] ?? '10:00',
+              'room': item['room'] ?? '',
+              'class_type': mappedType,
+              'faculty_name': item['faculty_name'],
+            });
+          }
         }
-      });
-    }
-    if (draft['starting_conducted'] is Map) {
-      _startingConducted.clear();
-      (draft['starting_conducted'] as Map).forEach((k, v) {
-        if (k is String && v is num) {
-          _startingConducted[k] = v.toInt();
-        }
-      });
-    }
+      }
+      if (draft['routine_day_of_week'] is int) {
+        _routineDayOfWeek = draft['routine_day_of_week'] as int;
+      }
+      if (draft['routine_start'] is String) {
+        _routineStartCtrl.text = draft['routine_start'] as String;
+      }
+      if (draft['routine_end'] is String) {
+        _routineEndCtrl.text = draft['routine_end'] as String;
+      }
+      if (draft['routine_room'] is String) {
+        _routineRoomCtrl.text = draft['routine_room'] as String;
+      }
+      if (draft['selected_routine_subject'] is String) {
+        _selectedRoutineSubject = draft['selected_routine_subject'] as String;
+      }
 
-    // Ensure selected routine subject is valid
-    if (_selectedRoutineSubject == null || !_subjects.any((s) => s['name'] == _selectedRoutineSubject)) {
-      _selectedRoutineSubject = _subjects.isNotEmpty ? _subjects.first['name'] as String : null;
-    }
+      // Step 5: Restore holidays from draft, but never let stale default suggestions overwrite real DB holidays
+      if (draft['holidays'] is List && (draft['holidays'] as List).isNotEmpty) {
+        final rawList = (draft['holidays'] as List).whereType<Map>().toList();
+        final hasRealHolidays = _holidays.isNotEmpty;
+        final isOnlyDefaults = rawList.isNotEmpty &&
+            rawList.every(
+              (h) =>
+                  h['title'] == 'Diwali Break' ||
+                  h['title'] == 'Mid-Term Break',
+            );
+
+        // If DB already provided holidays or this is a returning/existing semester, ignore hardcoded defaults from draft
+        if (!(hasRealHolidays && isOnlyDefaults) &&
+            !((_isReturningUser || _availableSemesterNumbers.isNotEmpty) &&
+                isOnlyDefaults)) {
+          final filteredList = (_isReturningUser ||
+                  _availableSemesterNumbers.isNotEmpty ||
+                  hasRealHolidays)
+              ? rawList
+                  .where((h) =>
+                      h['title'] != 'Diwali Break' &&
+                      h['title'] != 'Mid-Term Break')
+                  .toList()
+              : rawList;
+
+          if (filteredList.isNotEmpty) {
+            _holidays.clear();
+            for (final item in filteredList) {
+              DateTime? sDate;
+              DateTime? eDate;
+              if (item['start_date'] is String) {
+                try {
+                  sDate = DateTime.parse(item['start_date'] as String);
+                } catch (_) {}
+              }
+              if (item['end_date'] is String) {
+                try {
+                  eDate = DateTime.parse(item['end_date'] as String);
+                } catch (_) {}
+              }
+              if (sDate != null && eDate != null) {
+                _holidays.add({
+                  'title': item['title'] ?? 'Holiday',
+                  'start_date': sDate,
+                  'end_date': eDate,
+                  'category': (item['category'] == 'Break')
+                      ? 'Semester Break'
+                      : (item['category'] ?? 'University Holiday'),
+                  'notes': item['notes'],
+                });
+              }
+            }
+          }
+        }
+      }
+      if (draft['holiday_title'] is String) {
+        _holidayTitleCtrl.text = draft['holiday_title'] as String;
+      }
+      if (draft['holiday_start_date'] is String) {
+        try {
+          _holidayStartDate =
+              DateTime.parse(draft['holiday_start_date'] as String);
+        } catch (_) {}
+      }
+      if (draft['holiday_end_date'] is String) {
+        try {
+          _holidayEndDate = DateTime.parse(draft['holiday_end_date'] as String);
+        } catch (_) {}
+      }
+
+      // Step 6: Starting attendance
+      if (draft['starting_attended'] is Map &&
+          (draft['starting_attended'] as Map).isNotEmpty) {
+        _startingAttended.clear();
+        (draft['starting_attended'] as Map).forEach((k, v) {
+          if (k is String && v is num) {
+            _startingAttended[k] = v.toInt();
+          }
+        });
+      }
+      if (draft['starting_conducted'] is Map &&
+          (draft['starting_conducted'] as Map).isNotEmpty) {
+        _startingConducted.clear();
+        (draft['starting_conducted'] as Map).forEach((k, v) {
+          if (k is String && v is num) {
+            _startingConducted[k] = v.toInt();
+          }
+        });
+      }
+
+      // Ensure selected routine subject is valid
+      if (_selectedRoutineSubject == null ||
+          !_subjects.any((s) => s['name'] == _selectedRoutineSubject)) {
+        _selectedRoutineSubject =
+            _subjects.isNotEmpty ? _subjects.first['name'] as String : null;
+      }
     } finally {
-      _isRestoringDraft = false;
+      _restoringDraftCount--;
     }
   }
 
   void _syncPageToCurrentStep() {
     void doJump() {
-      if (mounted && _pageController.hasClients && _pageController.page?.round() != _currentStep) {
+      if (mounted &&
+          _pageController.hasClients &&
+          _pageController.page?.round() != _currentStep) {
         _pageController.jumpToPage(_currentStep);
       }
     }
+
     if (_pageController.hasClients) {
       doJump();
     }
@@ -754,7 +818,7 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
   }
 
   void _saveDraft({bool immediate = false}) {
-    if (_isCommitted) return;
+    if (_isCommitted || _isRestoringDraft || _isLoadingSemesterData) return;
     if (immediate) {
       _draftDebounceTimer?.cancel();
       _executeSaveDraft();
@@ -768,7 +832,17 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
   }
 
   Future<void> _executeSaveDraft({bool allowUnmounted = false}) async {
-    if (_isCommitted || (!mounted && !allowUnmounted)) return;
+    if (_isCommitted ||
+        _isRestoringDraft ||
+        _isLoadingSemesterData ||
+        (!mounted && !allowUnmounted)) {
+      return;
+    }
+    if (_subjects.isEmpty &&
+        _timetableEntries.isEmpty &&
+        _availableSemesterNumbers.isNotEmpty) {
+      return;
+    }
     try {
       final userId = _getUserId();
       final draft = _serializeDraft();
@@ -783,6 +857,10 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
       final userId = _getUserId();
       final draft = await _storage.getAcademicSetupDraft(userId);
       if (draft != null && mounted) {
+        final draftSem = draft['semester_number'];
+        if (draftSem is int && draftSem != _semesterNumber) {
+          return;
+        }
         setState(() {
           _restoreDraft(draft);
         });
@@ -814,14 +892,21 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
     if (!mounted) return;
     setState(() => _isLoadingSemesterData = true);
     try {
-      final data = await ref.read(setupProvider.notifier).fetchSetupData(semesterNumber: targetSemester);
+      final data = await ref
+          .read(setupProvider.notifier)
+          .fetchSetupData(semesterNumber: targetSemester);
       if (data != null && mounted) {
-        final nums = (data['available_semester_numbers'] as List?)?.map((e) => (e as num).toInt()).toList() ?? [];
+        final nums = (data['available_semester_numbers'] as List?)
+                ?.map((e) => (e as num).toInt())
+                .toList() ??
+            [];
         _availableSemesterNumbers = nums.toSet();
 
         final semInfo = data['semester'] as Map<String, dynamic>?;
-        final activeSem = ref.read(semestersProvider).activeSemester?.semesterNumber;
-        final semNum = (semInfo?['semester_number'] as num?)?.toInt() ?? (targetSemester ?? activeSem ?? _semesterNumber);
+        final activeSem =
+            ref.read(semestersProvider).activeSemester?.semesterNumber;
+        final semNum = (semInfo?['semester_number'] as num?)?.toInt() ??
+            (targetSemester ?? activeSem ?? _semesterNumber);
         _semesterCache[semNum] = data;
 
         _applySetupData(data);
@@ -830,7 +915,9 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
         if (!_isReturningUser) {
           final status = ref.read(setupProvider).status;
           final isRevisiting = status?.setupComplete == true || nums.isNotEmpty;
-          if (isRevisiting && widget.initialSemesterNumber == null && _currentStep == 0) {
+          if (isRevisiting &&
+              widget.initialSemesterNumber == null &&
+              _currentStep == 0) {
             _currentStep = 1;
           }
         }
@@ -846,127 +933,177 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
   }
 
   void _applySetupData(Map<String, dynamic> data) {
-    _isRestoringDraft = true;
+    _restoringDraftCount++;
     try {
-      if (data['university_name'] is String && (data['university_name'] as String).isNotEmpty) {
-      _universityCtrl.text = data['university_name'] as String;
-    }
-    if (data['course_name'] is String && (data['course_name'] as String).isNotEmpty) {
-      _courseCtrl.text = data['course_name'] as String;
-    }
-    if (data['full_name'] is String && (data['full_name'] as String).isNotEmpty) {
-      _fullNameCtrl.text = data['full_name'] as String;
-    }
-    if (data['student_id_number'] is String && (data['student_id_number'] as String).isNotEmpty) {
-      _studentIdCtrl.text = data['student_id_number'] as String;
-    }
-    if (data['academic_duration_years'] is int) {
-      _durationYears = data['academic_duration_years'] as int;
-    }
-    if (data['academic_session_start'] is int) {
-      _sessionStart = data['academic_session_start'] as int;
-    }
-    if (data['academic_session_end'] is int) {
-      _sessionEnd = data['academic_session_end'] as int;
-    }
-    if (data['minimum_attendance'] != null) {
-      _minAttendance = (data['minimum_attendance'] as num).toDouble();
-    }
-    if (data['personal_target'] != null) {
-      _personalTarget = (data['personal_target'] as num).toDouble();
-    }
+      if (data['university_name'] is String &&
+          (data['university_name'] as String).isNotEmpty) {
+        _universityCtrl.text = data['university_name'] as String;
+      }
+      if (data['course_name'] is String &&
+          (data['course_name'] as String).isNotEmpty) {
+        _courseCtrl.text = data['course_name'] as String;
+      }
+      if (data['full_name'] is String &&
+          (data['full_name'] as String).isNotEmpty) {
+        _fullNameCtrl.text = data['full_name'] as String;
+      }
+      if (data['student_id_number'] is String &&
+          (data['student_id_number'] as String).isNotEmpty) {
+        _studentIdCtrl.text = data['student_id_number'] as String;
+      }
+      if (data['academic_duration_years'] is int) {
+        _durationYears = data['academic_duration_years'] as int;
+      }
+      if (data['academic_session_start'] is int) {
+        _sessionStart = data['academic_session_start'] as int;
+      }
+      if (data['academic_session_end'] is int) {
+        _sessionEnd = data['academic_session_end'] as int;
+      }
+      if (data['minimum_attendance'] != null) {
+        _minAttendance = (data['minimum_attendance'] as num).toDouble();
+      }
+      if (data['personal_target'] != null) {
+        _personalTarget = (data['personal_target'] as num).toDouble();
+      }
 
-    final semInfo = data['semester'] as Map<String, dynamic>?;
-    if (semInfo != null) {
-      _semesterNumber = (semInfo['semester_number'] as num?)?.toInt() ?? _semesterNumber;
-      if (semInfo['semester_label'] is String) {
-        _semesterLabelCtrl.text = semInfo['semester_label'] as String;
-      }
-      if (semInfo['start_date'] is String) {
-        try {
-          _startDate = DateTime.parse(semInfo['start_date'] as String);
-        } catch (_) {}
-      }
-      if (semInfo['end_date'] is String) {
-        try {
-          _endDate = DateTime.parse(semInfo['end_date'] as String);
-        } catch (_) {}
-      }
-    }
-
-    if (data['subjects'] is List) {
-      _subjects.clear();
-      for (final s in data['subjects'] as List) {
-        if (s is Map) {
-          _subjects.add({
-            'name': s['name'] ?? '',
-            'code': s['code'],
-            'faculty': s['faculty_name'] ?? s['faculty'],
-            'color': s['color'] ?? '#C96E5B',
-          });
+      final semInfo = data['semester'] as Map<String, dynamic>?;
+      if (semInfo != null) {
+        _semesterNumber =
+            (semInfo['semester_number'] as num?)?.toInt() ?? _semesterNumber;
+        if (semInfo['semester_label'] is String) {
+          _semesterLabelCtrl.text = semInfo['semester_label'] as String;
+        }
+        if (semInfo['start_date'] is String) {
+          try {
+            _startDate = DateTime.parse(semInfo['start_date'] as String);
+          } catch (_) {}
+        }
+        if (semInfo['end_date'] is String) {
+          try {
+            _endDate = DateTime.parse(semInfo['end_date'] as String);
+          } catch (_) {}
+        }
+        if (semInfo['start_day'] is String &&
+            _allDays.contains(semInfo['start_day'])) {
+          _startDay = semInfo['start_day'] as String;
+        }
+        if (semInfo['end_day'] is String &&
+            _allDays.contains(semInfo['end_day'])) {
+          _endDay = semInfo['end_day'] as String;
+        } else if (semInfo['working_days'] is List &&
+            (semInfo['working_days'] as List).isNotEmpty) {
+          final wList = (semInfo['working_days'] as List)
+              .map((e) => (e as num).toInt())
+              .toList();
+          final minD = wList.reduce((a, b) => a < b ? a : b);
+          final maxD = wList.reduce((a, b) => a > b ? a : b);
+          if (minD >= 0 && minD < _allDays.length) _startDay = _allDays[minD];
+          if (maxD >= 0 && maxD < _allDays.length) _endDay = _allDays[maxD];
+        }
+        if (semInfo['class_start_hour'] is int) {
+          _classStartHour = semInfo['class_start_hour'] as int;
+        }
+        if (semInfo['class_end_hour'] is int) {
+          _classEndHour = semInfo['class_end_hour'] as int;
         }
       }
-    }
 
-    if (data['timetable_entries'] is List) {
-      _timetableEntries.clear();
-      for (final t in data['timetable_entries'] as List) {
-        if (t is Map) {
-          _timetableEntries.add({
-            'subject_name': t['subject_name'] ?? '',
-            'day_of_week': (t['day_of_week'] as num?)?.toInt() ?? 0,
-            'start_time': t['start_time'] ?? '09:00',
-            'end_time': t['end_time'] ?? '10:00',
-            'room': t['room'] ?? '',
-            'faculty_name': t['faculty_name'],
-            'class_type': 'Theory',
-          });
-        }
-      }
-    }
-
-    if (data['holidays'] is List) {
-      _holidays.clear();
-      for (final h in data['holidays'] as List) {
-        if (h is Map) {
-          DateTime? sDate;
-          DateTime? eDate;
-          if (h['start_date'] is String) {
-            try { sDate = DateTime.parse(h['start_date'] as String); } catch (_) {}
-          }
-          if (h['end_date'] is String) {
-            try { eDate = DateTime.parse(h['end_date'] as String); } catch (_) {}
-          }
-          if (sDate != null && eDate != null) {
-            _holidays.add({
-              'title': h['title'] ?? 'Holiday',
-              'start_date': sDate,
-              'end_date': eDate,
-              'category': (h['category'] == 'Break') ? 'Semester Break' : (h['category'] ?? 'University Holiday'),
-              'notes': h['notes'],
+      if (data['subjects'] is List) {
+        _subjects.clear();
+        for (final s in data['subjects'] as List) {
+          if (s is Map) {
+            _subjects.add({
+              'name': s['name'] ?? '',
+              'code': s['code'],
+              'faculty': s['faculty_name'] ?? s['faculty'],
+              'color': s['color'] ?? '#C96E5B',
             });
           }
         }
       }
-    }
 
-    _startingAttended.clear();
-    _startingConducted.clear();
-    if (data['starting_attendance'] is List) {
-      for (final sa in data['starting_attendance'] as List) {
-        if (sa is Map && sa['subject_name'] is String) {
-          final sName = sa['subject_name'] as String;
-          _startingAttended[sName] = (sa['attended_count'] as num?)?.toInt() ?? 0;
-          _startingConducted[sName] = (sa['conducted_count'] as num?)?.toInt() ?? 0;
+      if (data['timetable_entries'] is List) {
+        _timetableEntries.clear();
+        for (final t in data['timetable_entries'] as List) {
+          if (t is Map) {
+            final rawType =
+                (t['class_type'] as String?)?.toUpperCase() ?? 'THEORY';
+            final mappedType = (rawType == 'LAB' ||
+                    rawType.contains('LAB') ||
+                    rawType.contains('PRACTICAL'))
+                ? 'Lab'
+                : (rawType == 'UNSPECIFIED' || rawType.contains('OTHER'))
+                    ? 'Others'
+                    : 'Theory';
+            _timetableEntries.add({
+              'subject_name': t['subject_name'] ?? '',
+              'day_of_week': (t['day_of_week'] as num?)?.toInt() ?? 0,
+              'start_time': t['start_time'] ?? '09:00',
+              'end_time': t['end_time'] ?? '10:00',
+              'room': t['room'] ?? '',
+              'faculty_name': t['faculty_name'],
+              'class_type': mappedType,
+            });
+          }
         }
       }
-    }
 
-    if (_subjects.isNotEmpty) {
-      _selectedRoutineSubject = _subjects.first['name'] as String;
-    }
+      if (data['holidays'] is List) {
+        _holidays.clear();
+        for (final h in data['holidays'] as List) {
+          if (h is Map) {
+            DateTime? sDate;
+            DateTime? eDate;
+            if (h['start_date'] is String) {
+              try {
+                sDate = DateTime.parse(h['start_date'] as String);
+              } catch (_) {}
+            }
+            if (h['end_date'] is String) {
+              try {
+                eDate = DateTime.parse(h['end_date'] as String);
+              } catch (_) {}
+            }
+            if (sDate != null && eDate != null) {
+              _holidays.add({
+                'title': h['title'] ?? 'Holiday',
+                'start_date': sDate,
+                'end_date': eDate,
+                'category': (h['category'] == 'Break')
+                    ? 'Semester Break'
+                    : (h['category'] ?? 'University Holiday'),
+                'notes': h['notes'],
+              });
+            }
+          }
+        }
+        // If returning user or user has semesters in DB, ensure default suggestions never appear
+        if (_isReturningUser || _availableSemesterNumbers.isNotEmpty) {
+          _holidays.removeWhere((h) =>
+              h['title'] == 'Diwali Break' || h['title'] == 'Mid-Term Break');
+        }
+      }
+
+      _startingAttended.clear();
+      _startingConducted.clear();
+      if (data['starting_attendance'] is List) {
+        for (final sa in data['starting_attendance'] as List) {
+          if (sa is Map && sa['subject_name'] is String) {
+            final sName = sa['subject_name'] as String;
+            _startingAttended[sName] =
+                (sa['attended_count'] as num?)?.toInt() ?? 0;
+            _startingConducted[sName] =
+                (sa['conducted_count'] as num?)?.toInt() ?? 0;
+          }
+        }
+      }
+
+      if (_subjects.isNotEmpty) {
+        _selectedRoutineSubject = _subjects.first['name'] as String;
+      }
     } finally {
-      _isRestoringDraft = false;
+      _restoringDraftCount--;
     }
   }
 
@@ -984,9 +1121,13 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
           _semesterLabelCtrl.text = _formatSemesterLabel(newSem);
         });
       } else {
-        final data = await ref.read(setupProvider.notifier).fetchSetupData(semesterNumber: newSem);
+        final data = await ref
+            .read(setupProvider.notifier)
+            .fetchSetupData(semesterNumber: newSem);
         if (data != null && mounted) {
-          final isExisting = (data['semester'] as Map<String, dynamic>?)?['is_existing'] == true;
+          final isExisting =
+              (data['semester'] as Map<String, dynamic>?)?['is_existing'] ==
+                  true;
           if (isExisting) {
             _semesterCache[newSem] = data;
             setState(() {
@@ -1024,7 +1165,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
   String? _getValidRoutineSubject() {
     if (_subjects.isEmpty) return null;
     final availableNames = _subjects.map((s) => s['name'] as String).toSet();
-    if (_selectedRoutineSubject != null && availableNames.contains(_selectedRoutineSubject)) {
+    if (_selectedRoutineSubject != null &&
+        availableNames.contains(_selectedRoutineSubject)) {
       return _selectedRoutineSubject;
     }
     return _subjects.first['name'] as String;
@@ -1062,8 +1204,12 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
     setState(() {
       _subjects.add({
         'name': name,
-        'code': _newSubCodeCtrl.text.trim().isEmpty ? null : _newSubCodeCtrl.text.trim(),
-        'faculty': _newSubFacultyCtrl.text.trim().isEmpty ? null : _newSubFacultyCtrl.text.trim(),
+        'code': _newSubCodeCtrl.text.trim().isEmpty
+            ? null
+            : _newSubCodeCtrl.text.trim(),
+        'faculty': _newSubFacultyCtrl.text.trim().isEmpty
+            ? null
+            : _newSubFacultyCtrl.text.trim(),
         'color': _selectedSubColor,
       });
       _selectedRoutineSubject ??= name;
@@ -1091,8 +1237,10 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
       _startingConducted.remove(removedName);
 
       // 3. Reset _selectedRoutineSubject safely
-      if (_selectedRoutineSubject == removedName || !_subjects.any((s) => s['name'] == _selectedRoutineSubject)) {
-        _selectedRoutineSubject = _subjects.isNotEmpty ? _subjects.first['name'] as String : null;
+      if (_selectedRoutineSubject == removedName ||
+          !_subjects.any((s) => s['name'] == _selectedRoutineSubject)) {
+        _selectedRoutineSubject =
+            _subjects.isNotEmpty ? _subjects.first['name'] as String : null;
       }
     });
     _saveDraft(immediate: true);
@@ -1142,52 +1290,84 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
     final payload = {
       'university_name': uni.isEmpty ? 'Not specified' : uni,
       'course_name': course.isEmpty ? 'Not specified' : course,
-      'full_name': _fullNameCtrl.text.trim().isEmpty ? null : _fullNameCtrl.text.trim(),
-      'student_id_number': _studentIdCtrl.text.trim().isEmpty ? null : _studentIdCtrl.text.trim(),
+      'full_name':
+          _fullNameCtrl.text.trim().isEmpty ? null : _fullNameCtrl.text.trim(),
+      'student_id_number': _studentIdCtrl.text.trim().isEmpty
+          ? null
+          : _studentIdCtrl.text.trim(),
       'academic_duration_years': _durationYears,
       'academic_session_start': _sessionStart,
       'academic_session_end': _sessionEnd,
       'semester_number': _semesterNumber,
-      'semester_label': semLabel.isEmpty ? _formatSemesterLabel(_semesterNumber) : semLabel,
+      'semester_label':
+          semLabel.isEmpty ? _formatSemesterLabel(_semesterNumber) : semLabel,
       'start_date': DateFormat('yyyy-MM-dd').format(_startDate),
       'end_date': DateFormat('yyyy-MM-dd').format(_endDate),
+      'start_day': _startDay,
+      'end_day': _endDay,
+      'working_days': _scheduleDays
+          .map((d) => _allDays.indexOf(d))
+          .where((i) => i != -1)
+          .toList(),
+      'class_start_hour': _classStartHour,
+      'class_end_hour': _classEndHour,
       'minimum_attendance': _minAttendance,
       'personal_target': _personalTarget,
       'low_attendance_alert': 70.0,
-      'subjects': _subjects.map((s) => {
-        'name': (s['name'] as String).trim(),
-        'code': (s['code'] as String?)?.trim().isEmpty == true ? null : (s['code'] as String?)?.trim(),
-        'faculty_name': (s['faculty'] as String?)?.trim().isEmpty == true ? null : (s['faculty'] as String?)?.trim(),
-        'color': s['color'] ?? '#C96E5B',
-      }).toList(),
+      'subjects': _subjects
+          .map((s) => {
+                'name': (s['name'] as String).trim(),
+                'code': (s['code'] as String?)?.trim().isEmpty == true
+                    ? null
+                    : (s['code'] as String?)?.trim(),
+                'faculty_name':
+                    (s['faculty'] as String?)?.trim().isEmpty == true
+                        ? null
+                        : (s['faculty'] as String?)?.trim(),
+                'color': s['color'] ?? '#C96E5B',
+              })
+          .toList(),
       'timetable_entries': _timetableEntries
           .where((t) =>
               t['subject_name'] == 'Break Time' ||
               t['subject_name'] == 'Break' ||
               _subjects.any((s) => s['name'] == t['subject_name']))
           .map((t) => {
-            'subject_name': t['subject_name'],
-            'day_of_week': t['day_of_week'] is int ? t['day_of_week'] : int.tryParse(t['day_of_week'].toString()) ?? 0,
-            'start_time': t['start_time'],
-            'end_time': t['end_time'],
-            'room': t['room'],
-            'faculty_name': t['faculty_name'],
-          }).toList(),
-      'holidays': _holidays.map((h) => {
-        'title': (h['title'] as String).trim(),
-        'start_date': DateFormat('yyyy-MM-dd').format(h['start_date'] as DateTime),
-        'end_date': DateFormat('yyyy-MM-dd').format(h['end_date'] as DateTime),
-        'category': (h['category'] == 'Break') ? 'Semester Break' : (h['category'] ?? 'University Holiday'),
-        'notes': h['notes'],
-      }).toList(),
-      'starting_attendance': _subjects.map((s) {
-        final name = (s['name'] as String).trim();
-        return {
-          'subject_name': name,
-          'attended_count': _startingAttended[name] ?? 0,
-          'conducted_count': _startingConducted[name] ?? 0,
-        };
-      }).where((sa) => (sa['conducted_count'] as int) > 0).toList(),
+                'subject_name': t['subject_name'],
+                'day_of_week': t['day_of_week'] is int
+                    ? t['day_of_week']
+                    : int.tryParse(t['day_of_week'].toString()) ?? 0,
+                'start_time': t['start_time'],
+                'end_time': t['end_time'],
+                'room': t['room'],
+                'class_type': t['class_type'] ?? 'Theory',
+                'faculty_name': t['faculty_name'],
+              })
+          .toList(),
+      'holidays': _holidays
+          .map((h) => {
+                'title': (h['title'] as String).trim(),
+                'start_date': DateFormat('yyyy-MM-dd')
+                    .format(h['start_date'] as DateTime),
+                'end_date':
+                    DateFormat('yyyy-MM-dd').format(h['end_date'] as DateTime),
+                'category': (h['category'] == 'Break')
+                    ? 'Semester Break'
+                    : (h['category'] ?? 'University Holiday'),
+                'notes': h['notes'],
+              })
+          .toList(),
+      'starting_attendance': _subjects
+          .map((s) {
+            final name = (s['name'] as String).trim();
+            return {
+              'subject_name': name,
+              'attended_count': _startingAttended[name] ?? 0,
+              'conducted_count': _startingConducted[name] ?? 0,
+            };
+          })
+          .where((sa) => (sa['conducted_count'] as int) > 0)
+          .toList(),
     };
 
     final success = await ref.read(setupProvider.notifier).commitSetup(payload);
@@ -1208,7 +1388,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
         widget.onComplete();
       } else {
         setState(() {
-          _errorMessage = ref.read(setupProvider).errorMessage ?? 'Failed to save setup.';
+          _errorMessage =
+              ref.read(setupProvider).errorMessage ?? 'Failed to save setup.';
         });
       }
     }
@@ -1252,21 +1433,27 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
 
                     if (_errorMessage != null)
                       Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        margin: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           color: AppColors.coralLight,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.coral.withValues(alpha: 0.3)),
+                          border: Border.all(
+                              color: AppColors.coral.withValues(alpha: 0.3)),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.error_outline_rounded, color: AppColors.coral, size: 20),
+                            const Icon(Icons.error_outline_rounded,
+                                color: AppColors.coral, size: 20),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 _errorMessage!,
-                                style: const TextStyle(color: AppColors.coral, fontSize: 13, fontWeight: FontWeight.w600),
+                                style: const TextStyle(
+                                    color: AppColors.coral,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600),
                               ),
                             ),
                           ],
@@ -1314,7 +1501,7 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
             'Semester Term',
             'Subjects',
             'Timetable',
-            'Calendar',
+            'Holidays',
             'Initial Attendance',
             'Review & Save',
           ]
@@ -1323,7 +1510,7 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
             'Semester Term',
             'Subjects',
             'Timetable',
-            'Calendar',
+            'Holidays',
             'Initial Attendance',
             'Review & Save',
           ];
@@ -1344,10 +1531,12 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                   width: 36,
                   height: 36,
                   child: IconButton(
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+                    icon:
+                        const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
                     onPressed: _prevStep,
                     padding: EdgeInsets.zero,
-                    tooltip: _currentStep == 0 ? 'Close Setup' : 'Previous Step',
+                    tooltip:
+                        _currentStep == 0 ? 'Close Setup' : 'Previous Step',
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -1385,7 +1574,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                   }
                 },
                 style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   minimumSize: const Size(44, 32),
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
@@ -1407,7 +1597,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
               final isReached = idx <= _currentStep;
               return Expanded(
                 child: Padding(
-                  padding: EdgeInsets.only(right: idx < (totalSteps - 1) ? 5 : 0),
+                  padding:
+                      EdgeInsets.only(right: idx < (totalSteps - 1) ? 5 : 0),
                   child: InkWell(
                     key: Key('step_segment_$idx'),
                     onTap: () => _goToStep(idx),
@@ -1415,7 +1606,9 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                     child: Container(
                       height: 4,
                       decoration: BoxDecoration(
-                        color: isReached ? AppColors.terracotta : AppColors.divider,
+                        color: isReached
+                            ? AppColors.terracotta
+                            : AppColors.divider,
                         borderRadius: BorderRadius.circular(3),
                       ),
                     ),
@@ -1472,7 +1665,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
 
   Widget _buildBottomControls() {
     final maxStep = _isReturningUser ? 5 : 6;
-    final isSubjectsStep = _isReturningUser ? _currentStep == 1 : _currentStep == 2;
+    final isSubjectsStep =
+        _isReturningUser ? _currentStep == 1 : _currentStep == 2;
     final keyboardVisible = MediaQuery.of(context).viewInsets.bottom > 0;
 
     // When on Step 3 (Subjects) and mobile keyboard is visible,
@@ -1510,7 +1704,7 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
       ),
       child: AppButton(
         label: _currentStep == maxStep
-            ? (_isSubmitting ? 'Saving Setup...' : 'Confirm & Commit Setup')
+            ? (_isSubmitting ? 'Saving Setup...' : 'Confirm Configuration')
             : 'Continue to Step ${_currentStep + 2}',
         isLoading: _isSubmitting,
         onPressed: _isSubmitting ? null : _nextStep,
@@ -1529,64 +1723,66 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
         children: [
           _buildStepHeader(
             title: 'Academic Profile',
-            subtitle: 'Configure your institutional details. These settings apply globally across all your semesters.',
+            subtitle:
+                'Configure your institutional details. These settings apply globally across all your semesters.',
           ),
-
           AppTextField(
             label: 'Full Name',
             controller: _fullNameCtrl,
             hint: 'Your full name',
-            prefixIcon: const Icon(Icons.person_outline_rounded, size: 20, color: AppColors.inkMuted),
+            prefixIcon: const Icon(Icons.person_outline_rounded,
+                size: 20, color: AppColors.inkMuted),
             onEditingComplete: () {
               FocusScope.of(context).unfocus();
               _saveDraft();
             },
           ),
           const SizedBox(height: 14),
-
           AppTextField(
             label: 'University / College Name',
             controller: _universityCtrl,
             hint: 'e.g. Apex Technical University',
-            prefixIcon: const Icon(Icons.account_balance_outlined, size: 20, color: AppColors.inkMuted),
+            prefixIcon: const Icon(Icons.account_balance_outlined,
+                size: 20, color: AppColors.inkMuted),
             onEditingComplete: () {
               FocusScope.of(context).unfocus();
               _saveDraft();
             },
           ),
           const SizedBox(height: 14),
-
           AppTextField(
             label: 'Course / Degree Program',
             controller: _courseCtrl,
             hint: 'e.g. B.Tech Computer Science & Engineering',
-            prefixIcon: const Icon(Icons.school_outlined, size: 20, color: AppColors.inkMuted),
+            prefixIcon: const Icon(Icons.school_outlined,
+                size: 20, color: AppColors.inkMuted),
             onEditingComplete: () {
               FocusScope.of(context).unfocus();
               _saveDraft();
             },
           ),
           const SizedBox(height: 14),
-
           AppTextField(
             label: 'Student ID / Roll Number (Optional)',
             controller: _studentIdCtrl,
             hint: 'e.g. ADTU/2024/001',
-            prefixIcon: const Icon(Icons.badge_outlined, size: 20, color: AppColors.inkMuted),
+            prefixIcon: const Icon(Icons.badge_outlined,
+                size: 20, color: AppColors.inkMuted),
             onEditingComplete: () {
               FocusScope.of(context).unfocus();
               _saveDraft();
             },
           ),
           const SizedBox(height: 14),
-
           Row(
             children: [
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Degree Duration', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    const Text('Degree Duration',
+                        style: TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w600)),
                     const SizedBox(height: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -1600,7 +1796,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                           value: _durationYears,
                           isExpanded: true,
                           items: [1, 2, 3, 4, 5, 6].map((y) {
-                            return DropdownMenuItem(value: y, child: Text('$y Years'));
+                            return DropdownMenuItem(
+                                value: y, child: Text('$y Years'));
                           }).toList(),
                           onChanged: (val) {
                             setState(() => _durationYears = val ?? 4);
@@ -1617,7 +1814,9 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Session Span', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    const Text('Session Span',
+                        style: TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w600)),
                     const SizedBox(height: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -1631,9 +1830,14 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                           value: '$_sessionStart-$_sessionEnd',
                           isExpanded: true,
                           items: [
-                            '2022-2026', '2023-2027', '2024-2028', '2025-2029', '2026-2030'
+                            '2022-2026',
+                            '2023-2027',
+                            '2024-2028',
+                            '2025-2029',
+                            '2026-2030'
                           ].map((span) {
-                            return DropdownMenuItem(value: span, child: Text(span));
+                            return DropdownMenuItem(
+                                value: span, child: Text(span));
                           }).toList(),
                           onChanged: (val) {
                             if (val != null) {
@@ -1703,7 +1907,9 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                   children: [
                     // Minus Stepper Button [-]
                     Material(
-                      color: _semesterNumber > 1 ? const Color(0xFFF7F1EC) : AppColors.surfaceAlt,
+                      color: _semesterNumber > 1
+                          ? const Color(0xFFF7F1EC)
+                          : AppColors.surfaceAlt,
                       borderRadius: BorderRadius.circular(14),
                       child: InkWell(
                         onTap: (_semesterNumber > 1 && !_isLoadingSemesterData)
@@ -1741,21 +1947,25 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                           ),
                           const SizedBox(height: 5),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 3),
                             decoration: BoxDecoration(
-                              color: _availableSemesterNumbers.contains(_semesterNumber)
+                              color: _availableSemesterNumbers
+                                      .contains(_semesterNumber)
                                   ? AppColors.sage.withValues(alpha: 0.15)
                                   : AppColors.amber.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Text(
-                              _availableSemesterNumbers.contains(_semesterNumber)
+                              _availableSemesterNumbers
+                                      .contains(_semesterNumber)
                                   ? 'Saved in Records'
                                   : 'New Semester Term',
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
-                                color: _availableSemesterNumbers.contains(_semesterNumber)
+                                color: _availableSemesterNumbers
+                                        .contains(_semesterNumber)
                                     ? AppColors.sage
                                     : AppColors.amber,
                               ),
@@ -1772,7 +1982,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                           : AppColors.surfaceAlt,
                       borderRadius: BorderRadius.circular(14),
                       child: InkWell(
-                        onTap: (_semesterNumber < (_durationYears * 2) && !_isLoadingSemesterData)
+                        onTap: (_semesterNumber < (_durationYears * 2) &&
+                                !_isLoadingSemesterData)
                             ? () => _changeSemesterNumber(_semesterNumber + 1)
                             : null,
                         borderRadius: BorderRadius.circular(14),
@@ -1832,7 +2043,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                         color: AppColors.terracotta.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(Icons.calendar_today_rounded, color: AppColors.terracotta, size: 18),
+                      child: const Icon(Icons.calendar_today_rounded,
+                          color: AppColors.terracotta, size: 18),
                     ),
                     const SizedBox(width: 10),
                     const Expanded(
@@ -1841,12 +2053,16 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                         children: [
                           Text(
                             'Expected Semester Timings',
-                            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.ink),
+                            style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                                color: AppColors.ink),
                           ),
                           SizedBox(height: 2),
                           Text(
                             'Specify college start and end dates to calculate semester progress and forecasts accurately.',
-                            style: TextStyle(fontSize: 11, color: AppColors.inkMuted),
+                            style: TextStyle(
+                                fontSize: 11, color: AppColors.inkMuted),
                           ),
                         ],
                       ),
@@ -1880,7 +2096,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                             setState(() {
                               _startDate = picked;
                               if (_endDate.isBefore(_startDate)) {
-                                _endDate = _startDate.add(const Duration(days: 120));
+                                _endDate =
+                                    _startDate.add(const Duration(days: 120));
                               }
                             });
                             _saveDraft();
@@ -1888,7 +2105,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                         },
                         borderRadius: BorderRadius.circular(12),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
                           decoration: BoxDecoration(
                             color: AppColors.surfaceAlt,
                             borderRadius: BorderRadius.circular(12),
@@ -1897,15 +2115,22 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('College / Term Start', style: TextStyle(fontSize: 11, color: AppColors.inkMuted)),
+                              const Text('College / Term Start',
+                                  style: TextStyle(
+                                      fontSize: 11, color: AppColors.inkMuted)),
                               const SizedBox(height: 4),
                               Row(
                                 children: [
-                                  const Icon(Icons.event_available_rounded, size: 16, color: AppColors.terracotta),
+                                  const Icon(Icons.event_available_rounded,
+                                      size: 16, color: AppColors.terracotta),
                                   const SizedBox(width: 6),
                                   Text(
-                                    DateFormat('dd MMM yyyy').format(_startDate),
-                                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.ink),
+                                    DateFormat('dd MMM yyyy')
+                                        .format(_startDate),
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 13,
+                                        color: AppColors.ink),
                                   ),
                                 ],
                               ),
@@ -1942,7 +2167,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                         },
                         borderRadius: BorderRadius.circular(12),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
                           decoration: BoxDecoration(
                             color: AppColors.surfaceAlt,
                             borderRadius: BorderRadius.circular(12),
@@ -1951,15 +2177,21 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('College / Term End', style: TextStyle(fontSize: 11, color: AppColors.inkMuted)),
+                              const Text('College / Term End',
+                                  style: TextStyle(
+                                      fontSize: 11, color: AppColors.inkMuted)),
                               const SizedBox(height: 4),
                               Row(
                                 children: [
-                                  const Icon(Icons.event_busy_rounded, size: 16, color: AppColors.amberDark),
+                                  const Icon(Icons.event_busy_rounded,
+                                      size: 16, color: AppColors.amberDark),
                                   const SizedBox(width: 6),
                                   Text(
                                     DateFormat('dd MMM yyyy').format(_endDate),
-                                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.ink),
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 13,
+                                        color: AppColors.ink),
                                   ),
                                 ],
                               ),
@@ -1994,7 +2226,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                         color: AppColors.terracotta.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(Icons.schedule_rounded, color: AppColors.terracotta, size: 18),
+                      child: const Icon(Icons.schedule_rounded,
+                          color: AppColors.terracotta, size: 18),
                     ),
                     const SizedBox(width: 10),
                     const Expanded(
@@ -2003,12 +2236,16 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                         children: [
                           Text(
                             'Timings',
-                            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.ink),
+                            style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                                color: AppColors.ink),
                           ),
                           SizedBox(height: 2),
                           Text(
                             'Configures your timetable grid slots and active academic days.',
-                            style: TextStyle(fontSize: 11, color: AppColors.inkMuted),
+                            style: TextStyle(
+                                fontSize: 11, color: AppColors.inkMuted),
                           ),
                         ],
                       ),
@@ -2018,7 +2255,11 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                 const SizedBox(height: 16),
 
                 // Section 1: Class Timings (Start & End)
-                const Text('Class Timings', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.ink)),
+                const Text('Class Timings',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.ink)),
                 const SizedBox(height: 6),
                 Row(
                   children: [
@@ -2027,10 +2268,13 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Start Time', style: TextStyle(fontSize: 11, color: AppColors.inkMuted)),
+                          const Text('Start Time',
+                              style: TextStyle(
+                                  fontSize: 11, color: AppColors.inkMuted)),
                           const SizedBox(height: 4),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 2),
                             decoration: BoxDecoration(
                               color: AppColors.surface,
                               borderRadius: BorderRadius.circular(12),
@@ -2040,23 +2284,75 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                               child: DropdownButton<int>(
                                 value: _classStartHour,
                                 isExpanded: true,
-                                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: AppColors.ink),
+                                style: const TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w500,
+                                    color: AppColors.ink),
                                 items: const [
-                                  DropdownMenuItem(value: 7, child: Text('7 AM', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: AppColors.ink))),
-                                  DropdownMenuItem(value: 8, child: Text('8 AM', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: AppColors.ink))),
-                                  DropdownMenuItem(value: 9, child: Text('9 AM (Default)', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: AppColors.ink))),
-                                  DropdownMenuItem(value: 10, child: Text('10 AM', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: AppColors.ink))),
-                                  DropdownMenuItem(value: 11, child: Text('11 AM', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: AppColors.ink))),
-                                  DropdownMenuItem(value: 12, child: Text('12 PM', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: AppColors.ink))),
-                                  DropdownMenuItem(value: 13, child: Text('1 PM', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: AppColors.ink))),
-                                  DropdownMenuItem(value: 14, child: Text('2 PM', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: AppColors.ink))),
+                                  DropdownMenuItem(
+                                      value: 7,
+                                      child: Text('7 AM',
+                                          style: TextStyle(
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w500,
+                                              color: AppColors.ink))),
+                                  DropdownMenuItem(
+                                      value: 8,
+                                      child: Text('8 AM',
+                                          style: TextStyle(
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w500,
+                                              color: AppColors.ink))),
+                                  DropdownMenuItem(
+                                      value: 9,
+                                      child: Text('9 AM (Default)',
+                                          style: TextStyle(
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w500,
+                                              color: AppColors.ink))),
+                                  DropdownMenuItem(
+                                      value: 10,
+                                      child: Text('10 AM',
+                                          style: TextStyle(
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w500,
+                                              color: AppColors.ink))),
+                                  DropdownMenuItem(
+                                      value: 11,
+                                      child: Text('11 AM',
+                                          style: TextStyle(
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w500,
+                                              color: AppColors.ink))),
+                                  DropdownMenuItem(
+                                      value: 12,
+                                      child: Text('12 PM',
+                                          style: TextStyle(
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w500,
+                                              color: AppColors.ink))),
+                                  DropdownMenuItem(
+                                      value: 13,
+                                      child: Text('1 PM',
+                                          style: TextStyle(
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w500,
+                                              color: AppColors.ink))),
+                                  DropdownMenuItem(
+                                      value: 14,
+                                      child: Text('2 PM',
+                                          style: TextStyle(
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w500,
+                                              color: AppColors.ink))),
                                 ],
                                 onChanged: (val) {
                                   if (val != null) {
                                     setState(() {
                                       _classStartHour = val;
                                       if (_classEndHour <= _classStartHour) {
-                                        _classEndHour = (_classStartHour + 1).clamp(8, 22);
+                                        _classEndHour =
+                                            (_classStartHour + 1).clamp(8, 22);
                                       }
                                     });
                                     _saveDraft();
@@ -2074,10 +2370,13 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('End Time', style: TextStyle(fontSize: 11, color: AppColors.inkMuted)),
+                          const Text('End Time',
+                              style: TextStyle(
+                                  fontSize: 11, color: AppColors.inkMuted)),
                           const SizedBox(height: 4),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 2),
                             decoration: BoxDecoration(
                               color: AppColors.surface,
                               borderRadius: BorderRadius.circular(12),
@@ -2087,25 +2386,89 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                               child: DropdownButton<int>(
                                 value: _classEndHour,
                                 isExpanded: true,
-                                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: AppColors.ink),
+                                style: const TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w500,
+                                    color: AppColors.ink),
                                 items: const [
-                                  DropdownMenuItem(value: 12, child: Text('12 PM', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: AppColors.ink))),
-                                  DropdownMenuItem(value: 13, child: Text('1 PM', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: AppColors.ink))),
-                                  DropdownMenuItem(value: 14, child: Text('2 PM', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: AppColors.ink))),
-                                  DropdownMenuItem(value: 15, child: Text('3 PM', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: AppColors.ink))),
-                                  DropdownMenuItem(value: 16, child: Text('4 PM (Default)', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: AppColors.ink))),
-                                  DropdownMenuItem(value: 17, child: Text('5 PM', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: AppColors.ink))),
-                                  DropdownMenuItem(value: 18, child: Text('6 PM', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: AppColors.ink))),
-                                  DropdownMenuItem(value: 19, child: Text('7 PM', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: AppColors.ink))),
-                                  DropdownMenuItem(value: 20, child: Text('8 PM', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: AppColors.ink))),
-                                  DropdownMenuItem(value: 21, child: Text('9 PM', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: AppColors.ink))),
+                                  DropdownMenuItem(
+                                      value: 12,
+                                      child: Text('12 PM',
+                                          style: TextStyle(
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w500,
+                                              color: AppColors.ink))),
+                                  DropdownMenuItem(
+                                      value: 13,
+                                      child: Text('1 PM',
+                                          style: TextStyle(
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w500,
+                                              color: AppColors.ink))),
+                                  DropdownMenuItem(
+                                      value: 14,
+                                      child: Text('2 PM',
+                                          style: TextStyle(
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w500,
+                                              color: AppColors.ink))),
+                                  DropdownMenuItem(
+                                      value: 15,
+                                      child: Text('3 PM',
+                                          style: TextStyle(
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w500,
+                                              color: AppColors.ink))),
+                                  DropdownMenuItem(
+                                      value: 16,
+                                      child: Text('4 PM (Default)',
+                                          style: TextStyle(
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w500,
+                                              color: AppColors.ink))),
+                                  DropdownMenuItem(
+                                      value: 17,
+                                      child: Text('5 PM',
+                                          style: TextStyle(
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w500,
+                                              color: AppColors.ink))),
+                                  DropdownMenuItem(
+                                      value: 18,
+                                      child: Text('6 PM',
+                                          style: TextStyle(
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w500,
+                                              color: AppColors.ink))),
+                                  DropdownMenuItem(
+                                      value: 19,
+                                      child: Text('7 PM',
+                                          style: TextStyle(
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w500,
+                                              color: AppColors.ink))),
+                                  DropdownMenuItem(
+                                      value: 20,
+                                      child: Text('8 PM',
+                                          style: TextStyle(
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w500,
+                                              color: AppColors.ink))),
+                                  DropdownMenuItem(
+                                      value: 21,
+                                      child: Text('9 PM',
+                                          style: TextStyle(
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w500,
+                                              color: AppColors.ink))),
                                 ],
                                 onChanged: (val) {
                                   if (val != null) {
                                     setState(() {
                                       _classEndHour = val;
                                       if (_classStartHour >= _classEndHour) {
-                                        _classStartHour = (_classEndHour - 1).clamp(6, 20);
+                                        _classStartHour =
+                                            (_classEndHour - 1).clamp(6, 20);
                                       }
                                     });
                                     _saveDraft();
@@ -2122,7 +2485,11 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                 const SizedBox(height: 14),
 
                 // Section 2: Working Days (Start & End)
-                const Text('Working Days', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.ink)),
+                const Text('Working Days',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.ink)),
                 const SizedBox(height: 6),
                 Row(
                   children: [
@@ -2131,10 +2498,13 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Day Wise Start', style: TextStyle(fontSize: 11, color: AppColors.inkMuted)),
+                          const Text('Day Wise Start',
+                              style: TextStyle(
+                                  fontSize: 11, color: AppColors.inkMuted)),
                           const SizedBox(height: 4),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 2),
                             decoration: BoxDecoration(
                               color: AppColors.surface,
                               borderRadius: BorderRadius.circular(12),
@@ -2144,13 +2514,19 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                               child: DropdownButton<String>(
                                 value: _startDay,
                                 isExpanded: true,
-                                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: AppColors.ink),
+                                style: const TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w500,
+                                    color: AppColors.ink),
                                 items: _allDays.map((d) {
                                   return DropdownMenuItem(
                                     value: d,
                                     child: Text(
                                       d == 'Monday' ? '$d (Default)' : d,
-                                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: AppColors.ink),
+                                      style: const TextStyle(
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.w500,
+                                          color: AppColors.ink),
                                     ),
                                   );
                                 }).toList(),
@@ -2179,10 +2555,13 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Day End', style: TextStyle(fontSize: 11, color: AppColors.inkMuted)),
+                          const Text('Day End',
+                              style: TextStyle(
+                                  fontSize: 11, color: AppColors.inkMuted)),
                           const SizedBox(height: 4),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 2),
                             decoration: BoxDecoration(
                               color: AppColors.surface,
                               borderRadius: BorderRadius.circular(12),
@@ -2192,13 +2571,19 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                               child: DropdownButton<String>(
                                 value: _endDay,
                                 isExpanded: true,
-                                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: AppColors.ink),
+                                style: const TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w500,
+                                    color: AppColors.ink),
                                 items: _allDays.map((d) {
                                   return DropdownMenuItem(
                                     value: d,
                                     child: Text(
                                       d == 'Saturday' ? '$d (Default)' : d,
-                                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: AppColors.ink),
+                                      style: const TextStyle(
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.w500,
+                                          color: AppColors.ink),
                                     ),
                                   );
                                 }).toList(),
@@ -2241,7 +2626,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                         color: AppColors.terracotta.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(Icons.verified_user_outlined, color: AppColors.terracotta, size: 18),
+                      child: const Icon(Icons.verified_user_outlined,
+                          color: AppColors.terracotta, size: 18),
                     ),
                     const SizedBox(width: 10),
                     const Expanded(
@@ -2250,11 +2636,15 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                         children: [
                           Text(
                             'Attendance Targets & Goals',
-                            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.ink),
+                            style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                                color: AppColors.ink),
                           ),
                           Text(
                             'Institutional minimum & your personal attendance goal',
-                            style: TextStyle(fontSize: 11, color: AppColors.inkMuted),
+                            style: TextStyle(
+                                fontSize: 11, color: AppColors.inkMuted),
                           ),
                         ],
                       ),
@@ -2267,23 +2657,34 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Mandatory Minimum', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.ink)),
+                    const Text('Mandatory Minimum',
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.ink)),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
                         color: AppColors.terracottaLight,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppColors.terracotta.withValues(alpha: 0.2)),
+                        border: Border.all(
+                            color: AppColors.terracotta.withValues(alpha: 0.2)),
                       ),
                       child: Text(
                         '${_minAttendance.toStringAsFixed(1)}% Required',
-                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: AppColors.terracottaDark),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                            color: AppColors.terracottaDark),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 2),
-                const Text('University threshold required to be eligible for exams.', style: TextStyle(fontSize: 11, color: AppColors.inkMuted)),
+                const Text(
+                    'University threshold required to be eligible for exams.',
+                    style: TextStyle(fontSize: 11, color: AppColors.inkMuted)),
                 SliderTheme(
                   data: SliderTheme.of(context).copyWith(
                     trackHeight: 6,
@@ -2291,8 +2692,10 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                     inactiveTrackColor: AppColors.sand,
                     thumbColor: AppColors.terracotta,
                     overlayColor: AppColors.terracotta.withValues(alpha: 0.12),
-                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8, elevation: 1.5),
-                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
+                    thumbShape: const RoundSliderThumbShape(
+                        enabledThumbRadius: 8, elevation: 1.5),
+                    overlayShape:
+                        const RoundSliderOverlayShape(overlayRadius: 16),
                   ),
                   child: Slider(
                     value: _minAttendance,
@@ -2309,23 +2712,34 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Personal Target', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.ink)),
+                    const Text('Personal Target',
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.ink)),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
                         color: AppColors.amberLight,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppColors.amber.withValues(alpha: 0.3)),
+                        border: Border.all(
+                            color: AppColors.amber.withValues(alpha: 0.3)),
                       ),
                       child: Text(
                         '${_personalTarget.toStringAsFixed(1)}% Goal',
-                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: Color(0xFF9E681A)),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                            color: Color(0xFF9E681A)),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 2),
-                const Text('Your aspirational target to maintain a safe attendance margin.', style: TextStyle(fontSize: 11, color: AppColors.inkMuted)),
+                const Text(
+                    'Your aspirational target to maintain a safe attendance margin.',
+                    style: TextStyle(fontSize: 11, color: AppColors.inkMuted)),
                 SliderTheme(
                   data: SliderTheme.of(context).copyWith(
                     trackHeight: 6,
@@ -2333,8 +2747,10 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                     inactiveTrackColor: AppColors.sand,
                     thumbColor: AppColors.amber,
                     overlayColor: AppColors.amber.withValues(alpha: 0.12),
-                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8, elevation: 1.5),
-                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
+                    thumbShape: const RoundSliderThumbShape(
+                        enabledThumbRadius: 8, elevation: 1.5),
+                    overlayShape:
+                        const RoundSliderOverlayShape(overlayRadius: 16),
                   ),
                   child: Slider(
                     value: _personalTarget,
@@ -2351,7 +2767,9 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                   spacing: 6,
                   runSpacing: 6,
                   children: [
-                    const Text('Quick presets:', style: TextStyle(fontSize: 11, color: AppColors.inkMuted)),
+                    const Text('Quick presets:',
+                        style:
+                            TextStyle(fontSize: 11, color: AppColors.inkMuted)),
                     ...[75.0, 80.0, 85.0, 90.0].map((preset) {
                       final isSelected = (_personalTarget - preset).abs() < 0.5;
                       return InkWell(
@@ -2361,21 +2779,32 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                           _saveDraft();
                         },
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: isSelected ? AppColors.amberLight : AppColors.surface,
+                            color: isSelected
+                                ? AppColors.amberLight
+                                : AppColors.surface,
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: isSelected ? AppColors.amber : AppColors.divider,
+                              color: isSelected
+                                  ? AppColors.amber
+                                  : AppColors.divider,
                               width: 1,
                             ),
                           ),
                           child: Text(
-                            preset == 75.0 ? '75% (Default)' : '${preset.toInt()}%',
+                            preset == 75.0
+                                ? '75% (Default)'
+                                : '${preset.toInt()}%',
                             style: TextStyle(
                               fontSize: 11,
-                              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                              color: isSelected ? const Color(0xFF9E681A) : AppColors.inkSecondary,
+                              fontWeight: isSelected
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                              color: isSelected
+                                  ? const Color(0xFF9E681A)
+                                  : AppColors.inkSecondary,
                             ),
                           ),
                         ),
@@ -2400,7 +2829,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
         children: [
           _buildStepHeader(
             title: 'Enroll Subjects',
-            subtitle: 'Add all subjects for this semester in one place. You can edit or remove subjects anytime.',
+            subtitle:
+                'Add all subjects for this semester in one place. You can edit or remove subjects anytime.',
             trailing: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
@@ -2409,7 +2839,10 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
               ),
               child: Text(
                 '${_subjects.length} Enrolled',
-                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: AppColors.terracotta),
+                style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    color: AppColors.terracotta),
               ),
             ),
           ),
@@ -2440,7 +2873,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                         color: AppColors.terracotta.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(Icons.menu_book_rounded, color: AppColors.terracotta, size: 18),
+                      child: const Icon(Icons.menu_book_rounded,
+                          color: AppColors.terracotta, size: 18),
                     ),
                     const SizedBox(width: 10),
                     const Expanded(
@@ -2449,12 +2883,16 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                         children: [
                           Text(
                             'Add New Subject',
-                            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.ink),
+                            style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                                color: AppColors.ink),
                           ),
                           SizedBox(height: 2),
                           Text(
                             'Configure subject identity, code and faculty',
-                            style: TextStyle(fontSize: 11, color: AppColors.inkMuted),
+                            style: TextStyle(
+                                fontSize: 11, color: AppColors.inkMuted),
                           ),
                         ],
                       ),
@@ -2467,7 +2905,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                   label: 'Subject Name (Required)',
                   controller: _newSubNameCtrl,
                   hint: 'e.g. Computer Networks',
-                  prefixIcon: const Icon(Icons.bookmark_border_rounded, size: 20, color: AppColors.inkMuted),
+                  prefixIcon: const Icon(Icons.bookmark_border_rounded,
+                      size: 20, color: AppColors.inkMuted),
                   onTapOutside: (_) {
                     FocusScope.of(context).unfocus();
                     _saveDraft();
@@ -2483,7 +2922,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                         label: 'Code (Optional)',
                         controller: _newSubCodeCtrl,
                         hint: 'e.g. CS-504',
-                        prefixIcon: const Icon(Icons.tag_rounded, size: 18, color: AppColors.inkMuted),
+                        prefixIcon: const Icon(Icons.tag_rounded,
+                            size: 18, color: AppColors.inkMuted),
                         onTapOutside: (_) {
                           FocusScope.of(context).unfocus();
                           _saveDraft();
@@ -2497,7 +2937,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                         label: 'Faculty (Optional)',
                         controller: _newSubFacultyCtrl,
                         hint: 'e.g. Prof. Ahmed',
-                        prefixIcon: const Icon(Icons.person_outline_rounded, size: 18, color: AppColors.inkMuted),
+                        prefixIcon: const Icon(Icons.person_outline_rounded,
+                            size: 18, color: AppColors.inkMuted),
                         onTapOutside: (_) {
                           FocusScope.of(context).unfocus();
                           _saveDraft();
@@ -2515,12 +2956,17 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                   children: [
                     const Row(
                       children: [
-                        Text('Color Accent', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.ink)),
+                        Text('Color Accent',
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.ink)),
                         SizedBox(width: 6),
                         Expanded(
                           child: Text(
                             '• Tap to select identity tint',
-                            style: TextStyle(fontSize: 11, color: AppColors.inkMuted),
+                            style: TextStyle(
+                                fontSize: 11, color: AppColors.inkMuted),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -2551,19 +2997,23 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                                   color: colorVal,
                                   shape: BoxShape.circle,
                                   border: Border.all(
-                                    color: isSelected ? AppColors.ink : Colors.white,
+                                    color: isSelected
+                                        ? AppColors.ink
+                                        : Colors.white,
                                     width: isSelected ? 2.5 : 1.5,
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: colorVal.withValues(alpha: isSelected ? 0.45 : 0.22),
+                                      color: colorVal.withValues(
+                                          alpha: isSelected ? 0.45 : 0.22),
                                       blurRadius: isSelected ? 6 : 4,
                                       offset: const Offset(0, 2),
                                     ),
                                   ],
                                 ),
                                 child: isSelected
-                                    ? const Icon(Icons.check_rounded, size: 18, color: Colors.white)
+                                    ? const Icon(Icons.check_rounded,
+                                        size: 18, color: Colors.white)
                                     : null,
                               ),
                             ),
@@ -2607,7 +3057,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.add_circle_outline_rounded, color: Colors.white, size: 19),
+                              Icon(Icons.add_circle_outline_rounded,
+                                  color: Colors.white, size: 19),
                               SizedBox(width: 8),
                               Text(
                                 'Add Subject',
@@ -2671,7 +3122,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                   ),
                   const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
                       color: AppColors.terracotta.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10),
@@ -2738,11 +3190,16 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   children: [
-                    Icon(Icons.auto_stories_outlined, size: 40, color: AppColors.inkMuted.withValues(alpha: 0.5)),
+                    Icon(Icons.auto_stories_outlined,
+                        size: 40,
+                        color: AppColors.inkMuted.withValues(alpha: 0.5)),
                     const SizedBox(height: 8),
                     const Text(
                       'No subjects enrolled yet',
-                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.ink),
+                      style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: AppColors.ink),
                     ),
                     const SizedBox(height: 4),
                     const Text(
@@ -2826,7 +3283,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                               ),
                             ),
                             child: Center(
-                              child: Icon(Icons.menu_book_rounded, color: subColor, size: 20),
+                              child: Icon(Icons.menu_book_rounded,
+                                  color: subColor, size: 20),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -2852,16 +3310,22 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                                   children: [
                                     if (code != null && code.trim().isNotEmpty)
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 7, vertical: 2.5),
                                         decoration: BoxDecoration(
-                                          color: subColor.withValues(alpha: 0.12),
-                                          borderRadius: BorderRadius.circular(6),
-                                          border: Border.all(color: subColor.withValues(alpha: 0.24)),
+                                          color:
+                                              subColor.withValues(alpha: 0.12),
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                          border: Border.all(
+                                              color: subColor.withValues(
+                                                  alpha: 0.24)),
                                         ),
                                         child: Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            Icon(Icons.tag_rounded, size: 10.5, color: subColor),
+                                            Icon(Icons.tag_rounded,
+                                                size: 10.5, color: subColor),
                                             const SizedBox(width: 3),
                                             Text(
                                               code.trim().toUpperCase(),
@@ -2875,18 +3339,25 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                                           ],
                                         ),
                                       ),
-                                    if (faculty != null && faculty.trim().isNotEmpty)
+                                    if (faculty != null &&
+                                        faculty.trim().isNotEmpty)
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 7, vertical: 2.5),
                                         decoration: BoxDecoration(
                                           color: AppColors.surfaceAlt,
-                                          borderRadius: BorderRadius.circular(6),
-                                          border: Border.all(color: AppColors.divider),
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                          border: Border.all(
+                                              color: AppColors.divider),
                                         ),
                                         child: Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            const Icon(Icons.person_outline_rounded, size: 11, color: AppColors.inkMuted),
+                                            const Icon(
+                                                Icons.person_outline_rounded,
+                                                size: 11,
+                                                color: AppColors.inkMuted),
                                             const SizedBox(width: 3),
                                             Text(
                                               faculty.trim(),
@@ -2899,12 +3370,17 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                                           ],
                                         ),
                                       ),
-                                    if ((code == null || code.trim().isEmpty) && (faculty == null || faculty.trim().isEmpty))
+                                    if ((code == null || code.trim().isEmpty) &&
+                                        (faculty == null ||
+                                            faculty.trim().isEmpty))
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 6, vertical: 2),
                                         decoration: BoxDecoration(
-                                          color: AppColors.sandLight.withValues(alpha: 0.6),
-                                          borderRadius: BorderRadius.circular(6),
+                                          color: AppColors.sandLight
+                                              .withValues(alpha: 0.6),
+                                          borderRadius:
+                                              BorderRadius.circular(6),
                                         ),
                                         child: Text(
                                           'Subject #${idx + 1}',
@@ -2933,10 +3409,12 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                                 width: 36,
                                 height: 36,
                                 decoration: BoxDecoration(
-                                  color: AppColors.coralLight.withValues(alpha: 0.7),
+                                  color: AppColors.coralLight
+                                      .withValues(alpha: 0.7),
                                   borderRadius: BorderRadius.circular(10),
                                   border: Border.all(
-                                    color: AppColors.coral.withValues(alpha: 0.25),
+                                    color:
+                                        AppColors.coral.withValues(alpha: 0.25),
                                     width: 1,
                                   ),
                                 ),
@@ -2978,7 +3456,9 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
-            color: isSelected ? color.withValues(alpha: 0.18) : AppColors.surfaceAlt,
+            color: isSelected
+                ? color.withValues(alpha: 0.18)
+                : AppColors.surfaceAlt,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
               color: isSelected ? color : AppColors.divider,
@@ -2989,13 +3469,15 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
             mainAxisSize: MainAxisSize.min,
             children: [
               if (icon != null) ...[
-                Icon(icon, size: 14, color: isSelected ? color : AppColors.inkMuted),
+                Icon(icon,
+                    size: 14, color: isSelected ? color : AppColors.inkMuted),
                 const SizedBox(width: 5),
               ] else ...[
                 Container(
                   width: 8,
                   height: 8,
-                  decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                  decoration:
+                      BoxDecoration(color: color, shape: BoxShape.circle),
                 ),
                 const SizedBox(width: 6),
               ],
@@ -3036,7 +3518,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
     return null;
   }
 
-  void _handleSlotTap(int dayIdx, int hour, {Map<String, dynamic>? existingEntry}) {
+  void _handleSlotTap(int dayIdx, int hour,
+      {Map<String, dynamic>? existingEntry}) {
     if (_quickAssignTool != null) {
       final isBreak = _quickAssignTool == 'Break Time';
       final startTimeStr = _formatHourString(hour);
@@ -3102,7 +3585,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
           _timetableEntries.remove(entryStarting);
         }
         _timetableEntries.removeWhere(
-          (t) => t['day_of_week'] == dayIdx && _parseHour(t['start_time']) == hour,
+          (t) =>
+              t['day_of_week'] == dayIdx && _parseHour(t['start_time']) == hour,
         );
         _timetableEntries.add({
           'subject_name': _quickAssignTool!,
@@ -3119,7 +3603,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
     }
 
     // No quick assign tool active: open slot editor modal directly
-    _openSlotEditor(dayOfWeek: dayIdx, startHour: hour, existingEntry: existingEntry);
+    _openSlotEditor(
+        dayOfWeek: dayIdx, startHour: hour, existingEntry: existingEntry);
   }
 
   // STEP 4: ROUTINE / TIMETABLE
@@ -3137,7 +3622,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
         children: [
           _buildStepHeader(
             title: 'Weekly Schedule',
-            subtitle: 'Tap any slot to schedule, or pick a Quick-Assign chip below to fast-fill slots.',
+            subtitle:
+                'Tap any slot to schedule, or pick a Quick-Assign chip below to fast-fill slots.',
           ),
 
           // Quick-Assign Toolbar
@@ -3149,7 +3635,10 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: AppColors.divider),
               boxShadow: const [
-                BoxShadow(color: AppColors.shadowWarm, blurRadius: 4, offset: Offset(0, 1)),
+                BoxShadow(
+                    color: AppColors.shadowWarm,
+                    blurRadius: 4,
+                    offset: Offset(0, 1)),
               ],
             ),
             child: Column(
@@ -3161,12 +3650,16 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                     const Expanded(
                       child: Row(
                         children: [
-                          Icon(Icons.touch_app_rounded, size: 16, color: AppColors.terracotta),
+                          Icon(Icons.touch_app_rounded,
+                              size: 16, color: AppColors.terracotta),
                           SizedBox(width: 6),
                           Expanded(
                             child: Text(
                               'Quick-Assign Tool',
-                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.ink),
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                  color: AppColors.ink),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
@@ -3186,18 +3679,23 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                       icon: Icon(
                         Icons.close_rounded,
                         size: 13,
-                        color: _quickAssignTool != null ? AppColors.terracotta : AppColors.inkLight.withValues(alpha: 0.5),
+                        color: _quickAssignTool != null
+                            ? AppColors.terracotta
+                            : AppColors.inkLight.withValues(alpha: 0.5),
                       ),
                       label: Text(
                         'Clear Selection',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
-                          color: _quickAssignTool != null ? AppColors.terracotta : AppColors.inkLight.withValues(alpha: 0.5),
+                          color: _quickAssignTool != null
+                              ? AppColors.terracotta
+                              : AppColors.inkLight.withValues(alpha: 0.5),
                         ),
                       ),
                       style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
                         minimumSize: const Size(0, 28),
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         backgroundColor: _quickAssignTool != null
@@ -3206,7 +3704,9 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                           side: BorderSide(
-                            color: _quickAssignTool != null ? AppColors.terracotta.withValues(alpha: 0.4) : AppColors.divider,
+                            color: _quickAssignTool != null
+                                ? AppColors.terracotta.withValues(alpha: 0.4)
+                                : AppColors.divider,
                           ),
                         ),
                       ),
@@ -3228,7 +3728,9 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                         onTap: () {
                           HapticFeedback.selectionClick();
                           setState(() {
-                            _quickAssignTool = _quickAssignTool == 'Break Time' ? null : 'Break Time';
+                            _quickAssignTool = _quickAssignTool == 'Break Time'
+                                ? null
+                                : 'Break Time';
                           });
                         },
                       ),
@@ -3238,7 +3740,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                         final name = sub['name'] as String;
                         final code = sub['code'] as String?;
                         final col = _parseColor(sub['color'] as String?);
-                        final label = (code != null && code.isNotEmpty) ? code : name;
+                        final label =
+                            (code != null && code.isNotEmpty) ? code : name;
                         final isSel = _quickAssignTool == name;
                         return Padding(
                           padding: const EdgeInsets.only(right: 8),
@@ -3277,19 +3780,36 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                   padding: const EdgeInsets.all(16),
                   child: const Column(
                     children: [
-                      SkeletonBox(width: double.infinity, height: 32, borderRadius: BorderRadius.all(Radius.circular(8))),
+                      SkeletonBox(
+                          width: double.infinity,
+                          height: 32,
+                          borderRadius: BorderRadius.all(Radius.circular(8))),
                       SizedBox(height: 12),
                       Expanded(
                         child: Row(
                           children: [
-                            SkeletonBox(width: 50, height: double.infinity, borderRadius: BorderRadius.all(Radius.circular(8))),
+                            SkeletonBox(
+                                width: 50,
+                                height: double.infinity,
+                                borderRadius:
+                                    BorderRadius.all(Radius.circular(8))),
                             SizedBox(width: 10),
                             Expanded(
                               child: Column(
                                 children: [
-                                  Expanded(child: SkeletonBox(width: double.infinity, height: double.infinity, borderRadius: BorderRadius.all(Radius.circular(8)))),
+                                  Expanded(
+                                      child: SkeletonBox(
+                                          width: double.infinity,
+                                          height: double.infinity,
+                                          borderRadius: BorderRadius.all(
+                                              Radius.circular(8)))),
                                   SizedBox(height: 8),
-                                  Expanded(child: SkeletonBox(width: double.infinity, height: double.infinity, borderRadius: BorderRadius.all(Radius.circular(8)))),
+                                  Expanded(
+                                      child: SkeletonBox(
+                                          width: double.infinity,
+                                          height: double.infinity,
+                                          borderRadius: BorderRadius.all(
+                                              Radius.circular(8)))),
                                 ],
                               ),
                             ),
@@ -3304,72 +3824,43 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
           else
             Container(
               decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.divider),
-              boxShadow: const [
-                BoxShadow(
-                  color: AppColors.shadowWarm,
-                  blurRadius: 10,
-                  offset: Offset(0, 3),
-                ),
-              ],
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 1. PINNED / FIXED LEFT DAY COLUMN
-                Container(
-                  width: dayColWidth,
-                  decoration: const BoxDecoration(
-                    color: AppColors.surface,
-                    border: Border(
-                      right: BorderSide(color: AppColors.divider, width: 1.0),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Color.fromRGBO(0, 0, 0, 0.03),
-                        blurRadius: 3,
-                        offset: Offset(1, 0),
-                      ),
-                    ],
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.divider),
+                boxShadow: const [
+                  BoxShadow(
+                    color: AppColors.shadowWarm,
+                    blurRadius: 10,
+                    offset: Offset(0, 3),
                   ),
-                  child: Column(
-                    children: [
-                      // Leftmost Day Column Header
-                      Container(
-                        width: dayColWidth,
-                        height: 42,
-                        alignment: Alignment.center,
-                        decoration: const BoxDecoration(
-                          color: AppColors.surface,
-                          border: Border(
-                            bottom: BorderSide(color: AppColors.divider),
-                          ),
-                        ),
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.calendar_today_rounded, size: 11, color: AppColors.terracotta),
-                            SizedBox(width: 3),
-                            Text(
-                              'Day',
-                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.ink),
-                            ),
-                          ],
-                        ),
+                ],
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 1. PINNED / FIXED LEFT DAY COLUMN
+                  Container(
+                    width: dayColWidth,
+                    decoration: const BoxDecoration(
+                      color: AppColors.surface,
+                      border: Border(
+                        right: BorderSide(color: AppColors.divider, width: 1.0),
                       ),
-
-                      // Leftmost Day Label Cells for Each Active Day
-                      ...activeDays.map((dayName) {
-                        final dayIdx = _allDays.indexOf(dayName);
-                        final daySlotsCount = _timetableEntries.where((t) => t['day_of_week'] == dayIdx).length;
-
-                        return Container(
+                      boxShadow: [
+                        BoxShadow(
+                          color: Color.fromRGBO(0, 0, 0, 0.03),
+                          blurRadius: 3,
+                          offset: Offset(1, 0),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        // Leftmost Day Column Header
+                        Container(
                           width: dayColWidth,
-                          height: slotHeight,
-                          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+                          height: 42,
                           alignment: Alignment.center,
                           decoration: const BoxDecoration(
                             color: AppColors.surface,
@@ -3377,135 +3868,178 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                               bottom: BorderSide(color: AppColors.divider),
                             ),
                           ),
-                          child: Column(
+                          child: const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
+                              Icon(Icons.calendar_today_rounded,
+                                  size: 11, color: AppColors.terracotta),
+                              SizedBox(width: 3),
                               Text(
-                                dayName,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 10.5,
-                                  color: AppColors.ink,
-                                  letterSpacing: -0.2,
-                                ),
-                                maxLines: 1,
-                                softWrap: false,
-                                overflow: TextOverflow.ellipsis,
+                                'Day',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.ink),
                               ),
-                              const SizedBox(height: 4),
-                              if (daySlotsCount > 0)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.sage.withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    '$daySlotsCount ${daySlotsCount == 1 ? 'class' : 'classes'}',
-                                    style: const TextStyle(
-                                      fontSize: 8.0,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.sage,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                )
-                              else
-                                const Text(
-                                  'No classes',
-                                  style: TextStyle(
-                                    fontSize: 8.0,
-                                    fontWeight: FontWeight.w500,
-                                    color: AppColors.inkMuted,
-                                  ),
-                                  maxLines: 1,
-                                ),
                             ],
                           ),
-                        );
-                      }),
-                    ],
-                  ),
-                ),
+                        ),
 
-                // 2. HORIZONTALLY SCROLLABLE HOUR SLOTS
-                Expanded(
-                  child: ScrollConfiguration(
-                    behavior: ScrollConfiguration.of(context).copyWith(
-                      dragDevices: {
-                        PointerDeviceKind.touch,
-                        PointerDeviceKind.mouse,
-                        PointerDeviceKind.trackpad,
-                        PointerDeviceKind.stylus,
-                      },
-                    ),
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      controller: _timetableScrollCtrl,
-                      physics: const BouncingScrollPhysics(),
-                      child: Container(
-                        color: AppColors.surface,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Time Column Headers Across the Top
-                            Container(
+                        // Leftmost Day Label Cells for Each Active Day
+                        ...activeDays.map((dayName) {
+                          final dayIdx = _allDays.indexOf(dayName);
+                          final daySlotsCount = _timetableEntries
+                              .where((t) => t['day_of_week'] == dayIdx)
+                              .length;
+
+                          return Container(
+                            width: dayColWidth,
+                            height: slotHeight,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 2, vertical: 6),
+                            alignment: Alignment.center,
+                            decoration: const BoxDecoration(
                               color: AppColors.surface,
-                              child: Row(
-                                children: hours.map((hour) {
-                                  final nextHour = hour + 1;
-                                  return Container(
-                                    width: hourColWidth,
-                                    height: 42,
-                                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                                    alignment: Alignment.center,
-                                    decoration: const BoxDecoration(
-                                      color: AppColors.surface,
-                                      border: Border(
-                                        right: BorderSide(color: AppColors.divider),
-                                        bottom: BorderSide(color: AppColors.divider),
-                                      ),
+                              border: Border(
+                                bottom: BorderSide(color: AppColors.divider),
+                              ),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  dayName,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 10.5,
+                                    color: AppColors.ink,
+                                    letterSpacing: -0.2,
+                                  ),
+                                  maxLines: 1,
+                                  softWrap: false,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 4),
+                                if (daySlotsCount > 0)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 4, vertical: 1.5),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.sage
+                                          .withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Text(
-                                      '${_formatHourDisplay(hour)} – ${_formatHourDisplay(nextHour)}',
+                                      '$daySlotsCount ${daySlotsCount == 1 ? 'class' : 'classes'}',
                                       style: const TextStyle(
+                                        fontSize: 8.0,
                                         fontWeight: FontWeight.w700,
-                                        fontSize: 11,
-                                        color: AppColors.ink,
+                                        color: AppColors.sage,
                                       ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      textAlign: TextAlign.center,
                                     ),
-                                  );
-                                }).toList(),
-                              ),
+                                  )
+                                else
+                                  const Text(
+                                    'No classes',
+                                    style: TextStyle(
+                                      fontSize: 8.0,
+                                      fontWeight: FontWeight.w500,
+                                      color: AppColors.inkMuted,
+                                    ),
+                                    maxLines: 1,
+                                  ),
+                              ],
                             ),
+                          );
+                        }),
+                      ],
+                    ),
+                  ),
 
-                            // Hour Slots for Each Day (Unified Block Spanning)
-                            ...activeDays.map((dayName) {
-                              final dayIdx = _allDays.indexOf(dayName);
-                              return Row(
-                                children: _buildDayHourCells(dayIdx, hours, hourColWidth, slotHeight),
-                              );
-                            }),
-                          ],
+                  // 2. HORIZONTALLY SCROLLABLE HOUR SLOTS
+                  Expanded(
+                    child: ScrollConfiguration(
+                      behavior: ScrollConfiguration.of(context).copyWith(
+                        dragDevices: {
+                          PointerDeviceKind.touch,
+                          PointerDeviceKind.mouse,
+                          PointerDeviceKind.trackpad,
+                          PointerDeviceKind.stylus,
+                        },
+                      ),
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        controller: _timetableScrollCtrl,
+                        physics: const BouncingScrollPhysics(),
+                        child: Container(
+                          color: AppColors.surface,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Time Column Headers Across the Top
+                              Container(
+                                color: AppColors.surface,
+                                child: Row(
+                                  children: hours.map((hour) {
+                                    final nextHour = hour + 1;
+                                    return Container(
+                                      width: hourColWidth,
+                                      height: 42,
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 6),
+                                      alignment: Alignment.center,
+                                      decoration: const BoxDecoration(
+                                        color: AppColors.surface,
+                                        border: Border(
+                                          right: BorderSide(
+                                              color: AppColors.divider),
+                                          bottom: BorderSide(
+                                              color: AppColors.divider),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        '${_formatHourDisplay(hour)} – ${_formatHourDisplay(nextHour)}',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 11,
+                                          color: AppColors.ink,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
+
+                              // Hour Slots for Each Day (Unified Block Spanning)
+                              ...activeDays.map((dayName) {
+                                final dayIdx = _allDays.indexOf(dayName);
+                                return Row(
+                                  children: _buildDayHourCells(
+                                      dayIdx, hours, hourColWidth, slotHeight),
+                                );
+                              }),
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
         ],
       ),
     );
   }
 
   // Generates row hour cells, dynamically collapsing multi-hour classes into a single unified spanning block
-  List<Widget> _buildDayHourCells(int dayIdx, List<int> hours, double hourColWidth, double slotHeight) {
+  List<Widget> _buildDayHourCells(
+      int dayIdx, List<int> hours, double hourColWidth, double slotHeight) {
     final cells = <Widget>[];
     int i = 0;
     while (i < hours.length) {
@@ -3513,8 +4047,10 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
       final startingEntry = _findEntryStartingAt(dayIdx, hour);
 
       if (startingEntry != null) {
-        final startH = _parseHour(startingEntry['start_time'] as String?) ?? hour;
-        final endH = _parseHour(startingEntry['end_time'] as String?) ?? (startH + 1);
+        final startH =
+            _parseHour(startingEntry['start_time'] as String?) ?? hour;
+        final endH =
+            _parseHour(startingEntry['end_time'] as String?) ?? (startH + 1);
         final remainingHours = hours.length - i;
         final span = (endH - startH).clamp(1, remainingHours).toInt();
         final blockWidth = hourColWidth * span;
@@ -3543,7 +4079,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
       } else {
         final spanningEntry = _findEntrySpanning(dayIdx, hour);
         if (spanningEntry != null) {
-          final endH = _parseHour(spanningEntry['end_time'] as String?) ?? (hour + 1);
+          final endH =
+              _parseHour(spanningEntry['end_time'] as String?) ?? (hour + 1);
           final remainingHours = hours.length - i;
           final span = (endH - hour).clamp(1, remainingHours).toInt();
           final blockWidth = hourColWidth * span;
@@ -3608,19 +4145,24 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
     final isBreak = subjectName.toLowerCase() == 'break time' ||
         subjectName.toLowerCase() == 'break' ||
         classType.toLowerCase() == 'break';
-    final isLab = !isBreak && (classType.toLowerCase().contains('lab') || classType.toLowerCase().contains('practical'));
+    final isLab = !isBreak &&
+        (classType.toLowerCase().contains('lab') ||
+            classType.toLowerCase().contains('practical'));
+    final isOther = !isBreak &&
+        !isLab &&
+        (classType.toLowerCase().contains('other') ||
+            classType.toLowerCase().contains('unspecified'));
 
-    final subjectColor = isBreak ? AppColors.amber : _getSubjectColor(subjectName);
+    final subjectColor =
+        isBreak ? AppColors.amber : _getSubjectColor(subjectName);
     final subjectCode = isBreak ? 'BREAK' : _getSubjectCode(subjectName);
 
     // Primary display: First priority CODES if set by user, else subject name
-    final hasCode = subjectCode != null && subjectCode.isNotEmpty && subjectCode != 'BREAK';
-    final primaryTitle = isBreak
-        ? 'Break Time'
-        : (hasCode ? subjectCode : subjectName);
-    final secondaryTitle = isBreak
-        ? null
-        : (hasCode ? subjectName : null);
+    final hasCode =
+        subjectCode != null && subjectCode.isNotEmpty && subjectCode != 'BREAK';
+    final primaryTitle =
+        isBreak ? 'Break Time' : (hasCode ? subjectCode : subjectName);
+    final secondaryTitle = isBreak ? null : (hasCode ? subjectName : null);
 
     final startH = _parseHour(startTime) ?? hour;
 
@@ -3635,7 +4177,9 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: isBreak ? AppColors.amber.withValues(alpha: 0.4) : subjectColor.withValues(alpha: 0.35),
+              color: isBreak
+                  ? AppColors.amber.withValues(alpha: 0.4)
+                  : subjectColor.withValues(alpha: 0.35),
               width: 1.2,
             ),
             boxShadow: const [
@@ -3663,7 +4207,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
               // 2. Card Content (IgnorePointer so touches pass through to outer InkWell, leaving right edge clear for edit button)
               IgnorePointer(
                 child: Padding(
-                  padding: const EdgeInsets.only(left: 10, right: 28, top: 6, bottom: 6),
+                  padding: const EdgeInsets.only(
+                      left: 10, right: 28, top: 6, bottom: 6),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -3672,24 +4217,38 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                       Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 5, vertical: 2),
                             decoration: BoxDecoration(
                               color: isBreak
                                   ? AppColors.amber
-                                  : (isLab ? AppColors.sage : subjectColor),
+                                  : (isLab
+                                      ? AppColors.sage
+                                      : (isOther
+                                          ? AppColors.ocean
+                                          : subjectColor)),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
-                              isBreak ? 'BREAK' : (isLab ? 'LAB' : 'THEORY'),
-                              style: const TextStyle(fontSize: 8, fontWeight: FontWeight.w800, color: Colors.white),
+                              isBreak
+                                  ? 'BREAK'
+                                  : (isLab
+                                      ? 'LAB'
+                                      : (isOther ? 'OTHER' : 'THEORY')),
+                              style: const TextStyle(
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white),
                             ),
                           ),
                           if (span > 1 && !isBreak) ...[
                             const SizedBox(width: 4),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 4, vertical: 2),
                               decoration: BoxDecoration(
-                                color: (isLab ? AppColors.sage : subjectColor).withValues(alpha: 0.15),
+                                color: (isLab ? AppColors.sage : subjectColor)
+                                    .withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(
@@ -3739,7 +4298,9 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
 
                       // Bottom: Timing & Room
                       Text(
-                        room.isNotEmpty ? '$room • $startTime – $endTime' : '$startTime – $endTime',
+                        room.isNotEmpty
+                            ? '$room • $startTime – $endTime'
+                            : '$startTime – $endTime',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -3761,11 +4322,16 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                   color: Colors.transparent,
                   child: InkWell(
                     key: Key('edit_slot_${dayIdx}_$startH'),
-                    onTap: () => _openSlotEditor(dayOfWeek: dayIdx, startHour: startH, existingEntry: entry),
+                    onTap: () => _openSlotEditor(
+                        dayOfWeek: dayIdx,
+                        startHour: startH,
+                        existingEntry: entry),
                     borderRadius: BorderRadius.circular(4),
                     child: Padding(
                       padding: const EdgeInsets.all(4),
-                      child: Icon(Icons.edit_outlined, size: 14, color: isBreak ? AppColors.amber : subjectColor),
+                      child: Icon(Icons.edit_outlined,
+                          size: 14,
+                          color: isBreak ? AppColors.amber : subjectColor),
                     ),
                   ),
                 ),
@@ -3813,7 +4379,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                       ),
                     ],
                   ),
-                  child: const Icon(Icons.add_rounded, size: 16, color: AppColors.terracotta),
+                  child: const Icon(Icons.add_rounded,
+                      size: 16, color: AppColors.terracotta),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -3850,15 +4417,29 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
 
     final dayName = _scheduleDays[dayOfWeek.clamp(0, _scheduleDays.length - 1)];
     String selectedSubject = existingEntry != null
-        ? (existingEntry['subject_name'] as String? ?? _getValidRoutineSubject() ?? '')
+        ? (existingEntry['subject_name'] as String? ??
+            _getValidRoutineSubject() ??
+            '')
         : (_getValidRoutineSubject() ?? '');
 
-    String classType = existingEntry?['class_type'] as String? ?? 'Theory';
-    int currentStartHour = _parseHour(existingEntry?['start_time'] as String?) ?? startHour;
+    final rawCt = existingEntry?['class_type'] as String? ?? 'Theory';
+    String classType =
+        (rawCt == 'LAB' || rawCt.contains('Lab') || rawCt.contains('Practical'))
+            ? 'Lab'
+            : (rawCt == 'Others' ||
+                    rawCt == 'UNSPECIFIED' ||
+                    rawCt.contains('Other'))
+                ? 'Others'
+                : 'Theory';
+    int currentStartHour =
+        _parseHour(existingEntry?['start_time'] as String?) ?? startHour;
     int currentEndHour = _parseHour(existingEntry?['end_time'] as String?) ??
-        (classType == 'Theory' ? (currentStartHour + 1).clamp(currentStartHour + 1, 23) : (currentStartHour + 2).clamp(currentStartHour + 1, 23));
+        ((classType == 'Lab' || classType == 'Practical/Lab')
+            ? (currentStartHour + 2).clamp(currentStartHour + 1, 23)
+            : (currentStartHour + 1).clamp(currentStartHour + 1, 23));
 
-    final roomCtrl = TextEditingController(text: existingEntry?['room'] as String? ?? '');
+    final roomCtrl =
+        TextEditingController(text: existingEntry?['room'] as String? ?? '');
 
     showModalBottomSheet(
       context: context,
@@ -3908,7 +4489,9 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                existingEntry != null ? 'Edit Schedule Slot' : 'Schedule Class',
+                                existingEntry != null
+                                    ? 'Edit Schedule Slot'
+                                    : 'Schedule Class',
                                 style: const TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w700,
@@ -3918,14 +4501,16 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                               const SizedBox(height: 2),
                               Text(
                                 '$dayName • $startDisplay – $endDisplay',
-                                style: const TextStyle(fontSize: 12, color: AppColors.inkMuted),
+                                style: const TextStyle(
+                                    fontSize: 12, color: AppColors.inkMuted),
                               ),
                             ],
                           ),
                         ),
                         if (existingEntry != null)
                           IconButton(
-                            icon: const Icon(Icons.delete_outline_rounded, color: AppColors.coral),
+                            icon: const Icon(Icons.delete_outline_rounded,
+                                color: AppColors.coral),
                             tooltip: 'Delete Slot',
                             onPressed: () {
                               setState(() {
@@ -3937,7 +4522,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                           )
                         else
                           IconButton(
-                            icon: const Icon(Icons.close_rounded, color: AppColors.inkMuted),
+                            icon: const Icon(Icons.close_rounded,
+                                color: AppColors.inkMuted),
                             tooltip: 'Close',
                             onPressed: () => Navigator.pop(ctx),
                           ),
@@ -3948,11 +4534,15 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                     // OPTION 1: SELECT SUBJECT
                     const Text(
                       '1. Select Subject',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.ink),
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.ink),
                     ),
                     const SizedBox(height: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 4),
                       decoration: BoxDecoration(
                         color: AppColors.surface,
                         borderRadius: BorderRadius.circular(12),
@@ -3960,9 +4550,13 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
-                          value: (selectedSubject == 'Break Time' || _subjects.any((s) => s['name'] == selectedSubject))
+                          value: (selectedSubject == 'Break Time' ||
+                                  _subjects
+                                      .any((s) => s['name'] == selectedSubject))
                               ? selectedSubject
-                              : (_subjects.isNotEmpty ? _subjects.first['name'] as String : 'Break Time'),
+                              : (_subjects.isNotEmpty
+                                  ? _subjects.first['name'] as String
+                                  : 'Break Time'),
                           isExpanded: true,
                           items: [
                             // 1. FIRST OPTION: BREAK "Break Time"
@@ -3982,18 +4576,26 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                                   const Expanded(
                                     child: Text(
                                       'Break Time',
-                                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.ink),
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 13,
+                                          color: AppColors.ink),
                                     ),
                                   ),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: AppColors.amber.withValues(alpha: 0.2),
+                                      color: AppColors.amber
+                                          .withValues(alpha: 0.2),
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: const Text(
                                       'BREAK',
-                                      style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: AppColors.amber),
+                                      style: TextStyle(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w800,
+                                          color: AppColors.amber),
                                     ),
                                   ),
                                 ],
@@ -4011,27 +4613,36 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                                     Container(
                                       width: 10,
                                       height: 10,
-                                      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                                      decoration: BoxDecoration(
+                                          color: color, shape: BoxShape.circle),
                                     ),
                                     const SizedBox(width: 10),
                                     Expanded(
                                       child: Text(
                                         name,
-                                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.ink),
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 13,
+                                            color: AppColors.ink),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
                                     if (code != null && code.isNotEmpty)
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 6, vertical: 2),
                                         decoration: BoxDecoration(
                                           color: color.withValues(alpha: 0.15),
-                                          borderRadius: BorderRadius.circular(6),
+                                          borderRadius:
+                                              BorderRadius.circular(6),
                                         ),
                                         child: Text(
                                           code,
-                                          style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w700),
+                                          style: TextStyle(
+                                              fontSize: 10,
+                                              color: color,
+                                              fontWeight: FontWeight.w700),
                                         ),
                                       ),
                                   ],
@@ -4045,7 +4656,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                                 selectedSubject = val;
                                 if (val == 'Break Time') {
                                   classType = 'Break';
-                                  currentEndHour = (currentStartHour + 1).clamp(currentStartHour + 1, 23);
+                                  currentEndHour = (currentStartHour + 1)
+                                      .clamp(currentStartHour + 1, 23);
                                 } else if (classType == 'Break') {
                                   classType = 'Theory';
                                 }
@@ -4060,7 +4672,10 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                     // OPTION 2: SELECT CLASS TYPE (Theory vs Practical/Lab)
                     const Text(
                       '2. Select Class Type',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.ink),
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.ink),
                     ),
                     const SizedBox(height: 8),
                     if (selectedSubject == 'Break Time')
@@ -4069,16 +4684,21 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                         decoration: BoxDecoration(
                           color: AppColors.amber.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.amber.withValues(alpha: 0.4)),
+                          border: Border.all(
+                              color: AppColors.amber.withValues(alpha: 0.4)),
                         ),
                         child: const Row(
                           children: [
-                            Icon(Icons.coffee_rounded, size: 18, color: AppColors.amber),
+                            Icon(Icons.coffee_rounded,
+                                size: 18, color: AppColors.amber),
                             SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 'Break / Recess interval (scheduled routine pause)',
-                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.ink),
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.ink),
                               ),
                             ),
                           ],
@@ -4093,19 +4713,25 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                               onTap: () {
                                 setModalState(() {
                                   classType = 'Theory';
-                                  currentEndHour = (currentStartHour + 1).clamp(currentStartHour + 1, 23);
+                                  currentEndHour = (currentStartHour + 1)
+                                      .clamp(currentStartHour + 1, 23);
                                 });
+                                HapticFeedback.selectionClick();
                               },
                               borderRadius: BorderRadius.circular(12),
                               child: Container(
-                                padding: const EdgeInsets.all(12),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 10),
                                 decoration: BoxDecoration(
                                   color: classType == 'Theory'
-                                      ? AppColors.terracotta.withValues(alpha: 0.12)
+                                      ? AppColors.terracotta
+                                          .withValues(alpha: 0.12)
                                       : AppColors.surface,
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: classType == 'Theory' ? AppColors.terracotta : AppColors.divider,
+                                    color: classType == 'Theory'
+                                        ? AppColors.terracotta
+                                        : AppColors.divider,
                                     width: classType == 'Theory' ? 2.0 : 1.0,
                                   ),
                                 ),
@@ -4116,24 +4742,34 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                                       children: [
                                         Icon(
                                           Icons.menu_book_rounded,
-                                          size: 18,
-                                          color: classType == 'Theory' ? AppColors.terracotta : AppColors.inkMuted,
+                                          size: 16,
+                                          color: classType == 'Theory'
+                                              ? AppColors.terracotta
+                                              : AppColors.inkMuted,
                                         ),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          'Theory',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 13,
-                                            color: classType == 'Theory' ? AppColors.terracotta : AppColors.ink,
+                                        const SizedBox(width: 4),
+                                        Flexible(
+                                          child: Text(
+                                            'Theory',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 12,
+                                              color: classType == 'Theory'
+                                                  ? AppColors.terracotta
+                                                  : AppColors.ink,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
                                           ),
                                         ),
                                       ],
                                     ),
                                     const SizedBox(height: 4),
                                     const Text(
-                                      'Default: 1 Hour',
-                                      style: TextStyle(fontSize: 11, color: AppColors.inkMuted),
+                                      '1 Hour',
+                                      style: TextStyle(
+                                          fontSize: 10.5,
+                                          color: AppColors.inkMuted),
                                     ),
                                   ],
                                 ),
@@ -4163,7 +4799,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                                   ignoreEntry: existingEntry,
                                 );
                                 if (conflict != null) {
-                                  final cName = conflict['subject_name'] ?? 'Class';
+                                  final cName =
+                                      conflict['subject_name'] ?? 'Class';
                                   final cStart = conflict['start_time'] ?? '';
                                   final cEnd = conflict['end_time'] ?? '';
                                   AppToast.showConflict(
@@ -4175,63 +4812,165 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                                 }
 
                                 setModalState(() {
-                                  classType = 'Practical/Lab';
+                                  classType = 'Lab';
                                   currentEndHour = targetEndHour;
                                 });
                                 HapticFeedback.selectionClick();
                               },
                               borderRadius: BorderRadius.circular(12),
                               child: Container(
-                                padding: const EdgeInsets.all(12),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 10),
                                 decoration: BoxDecoration(
-                                  color: classType == 'Practical/Lab'
+                                  color: (classType == 'Lab' ||
+                                          classType == 'Practical/Lab')
                                       ? AppColors.sage.withValues(alpha: 0.12)
                                       : AppColors.surface,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: classType == 'Practical/Lab' ? AppColors.sage : AppColors.divider,
-                                  width: classType == 'Practical/Lab' ? 2.0 : 1.0,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: (classType == 'Lab' ||
+                                            classType == 'Practical/Lab')
+                                        ? AppColors.sage
+                                        : AppColors.divider,
+                                    width: (classType == 'Lab' ||
+                                            classType == 'Practical/Lab')
+                                        ? 2.0
+                                        : 1.0,
+                                  ),
                                 ),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        Icons.biotech_rounded,
-                                        size: 18,
-                                        color: classType == 'Practical/Lab' ? AppColors.sage : AppColors.inkMuted,
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        'Practical / Lab',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 13,
-                                          color: classType == 'Practical/Lab' ? AppColors.sage : AppColors.ink,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.biotech_rounded,
+                                          size: 16,
+                                          color: (classType == 'Lab' ||
+                                                  classType == 'Practical/Lab')
+                                              ? AppColors.sage
+                                              : AppColors.inkMuted,
                                         ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  const Text(
-                                    'Default: 2 Hours',
-                                    style: TextStyle(fontSize: 11, color: AppColors.inkMuted),
-                                  ),
-                                ],
+                                        const SizedBox(width: 4),
+                                        Flexible(
+                                          child: Text(
+                                            'Lab',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 12,
+                                              color: (classType == 'Lab' ||
+                                                      classType ==
+                                                          'Practical/Lab')
+                                                  ? AppColors.sage
+                                                  : AppColors.ink,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    const Text(
+                                      '2 Hours',
+                                      style: TextStyle(
+                                          fontSize: 10.5,
+                                          color: AppColors.inkMuted),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
+                          const SizedBox(width: 8),
+
+                          // Others Option
+                          Expanded(
+                            child: InkWell(
+                              onTap: () {
+                                setModalState(() {
+                                  classType = 'Others';
+                                  currentEndHour = (currentStartHour + 1)
+                                      .clamp(currentStartHour + 1, 23);
+                                });
+                                HapticFeedback.selectionClick();
+                              },
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: (classType == 'Others' ||
+                                          classType == 'UNSPECIFIED')
+                                      ? AppColors.ocean.withValues(alpha: 0.12)
+                                      : AppColors.surface,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: (classType == 'Others' ||
+                                            classType == 'UNSPECIFIED')
+                                        ? AppColors.ocean
+                                        : AppColors.divider,
+                                    width: (classType == 'Others' ||
+                                            classType == 'UNSPECIFIED')
+                                        ? 2.0
+                                        : 1.0,
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.category_rounded,
+                                          size: 16,
+                                          color: (classType == 'Others' ||
+                                                  classType == 'UNSPECIFIED')
+                                              ? AppColors.ocean
+                                              : AppColors.inkMuted,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Flexible(
+                                          child: Text(
+                                            'Others',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 12,
+                                              color: (classType == 'Others' ||
+                                                      classType ==
+                                                          'UNSPECIFIED')
+                                                  ? AppColors.ocean
+                                                  : AppColors.ink,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    const Text(
+                                      '1 Hour',
+                                      style: TextStyle(
+                                          fontSize: 10.5,
+                                          color: AppColors.inkMuted),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     const SizedBox(height: 20),
 
                     // OPTION 3: SIDE-BY-SIDE TIMINGS (DYNAMIC DROPDOWNS)
                     const Text(
                       '3. Class Timings',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.ink),
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.ink),
                     ),
                     const SizedBox(height: 8),
                     Row(
@@ -4239,7 +4978,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                         // Start Time Dropdown
                         Expanded(
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 4),
                             decoration: BoxDecoration(
                               color: AppColors.surface,
                               borderRadius: BorderRadius.circular(12),
@@ -4250,9 +4990,14 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                               children: [
                                 const Row(
                                   children: [
-                                    Icon(Icons.schedule_rounded, size: 14, color: AppColors.inkMuted),
+                                    Icon(Icons.schedule_rounded,
+                                        size: 14, color: AppColors.inkMuted),
                                     SizedBox(width: 4),
-                                    Text('Start Time', style: TextStyle(fontSize: 11, color: AppColors.inkMuted, fontWeight: FontWeight.w600)),
+                                    Text('Start Time',
+                                        style: TextStyle(
+                                            fontSize: 11,
+                                            color: AppColors.inkMuted,
+                                            fontWeight: FontWeight.w600)),
                                   ],
                                 ),
                                 DropdownButtonHideUnderline(
@@ -4261,10 +5006,12 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                                     isExpanded: true,
                                     items: () {
                                       final startOpts = List.generate(
-                                        (_classEndHour - _classStartHour).clamp(1, 14),
+                                        (_classEndHour - _classStartHour)
+                                            .clamp(1, 14),
                                         (i) => _classStartHour + i,
                                       );
-                                      if (!startOpts.contains(currentStartHour)) {
+                                      if (!startOpts
+                                          .contains(currentStartHour)) {
                                         startOpts.add(currentStartHour);
                                         startOpts.sort();
                                       }
@@ -4273,16 +5020,20 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                                           value: h,
                                           child: Text(
                                             _formatHourDisplay(h),
-                                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.ink),
+                                            style: const TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w700,
+                                                color: AppColors.ink),
                                           ),
                                         );
                                       }).toList();
                                     }(),
                                     onChanged: (val) {
                                       if (val != null) {
-                                        final newEnd = (classType == 'Practical/Lab')
-                                            ? (val + 2).clamp(val + 1, 23)
-                                            : (val + 1).clamp(val + 1, 23);
+                                        final newEnd =
+                                            (classType == 'Practical/Lab')
+                                                ? (val + 2).clamp(val + 1, 23)
+                                                : (val + 1).clamp(val + 1, 23);
 
                                         if (newEnd > _classEndHour) {
                                           AppToast.showConflict(
@@ -4300,9 +5051,13 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                                           ignoreEntry: existingEntry,
                                         );
                                         if (conflict != null) {
-                                          final cName = conflict['subject_name'] ?? 'Class';
-                                          final cStart = conflict['start_time'] ?? '';
-                                          final cEnd = conflict['end_time'] ?? '';
+                                          final cName =
+                                              conflict['subject_name'] ??
+                                                  'Class';
+                                          final cStart =
+                                              conflict['start_time'] ?? '';
+                                          final cEnd =
+                                              conflict['end_time'] ?? '';
                                           AppToast.showConflict(
                                             context,
                                             'Time conflict: "$cName" is already scheduled from $cStart to $cEnd.',
@@ -4324,13 +5079,15 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                           ),
                         ),
                         const SizedBox(width: 10),
-                        const Icon(Icons.arrow_forward_rounded, color: AppColors.inkMuted, size: 16),
+                        const Icon(Icons.arrow_forward_rounded,
+                            color: AppColors.inkMuted, size: 16),
                         const SizedBox(width: 10),
 
                         // End Time Dropdown
                         Expanded(
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 4),
                             decoration: BoxDecoration(
                               color: AppColors.surface,
                               borderRadius: BorderRadius.circular(12),
@@ -4341,9 +5098,14 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                               children: [
                                 const Row(
                                   children: [
-                                    Icon(Icons.timer_outlined, size: 14, color: AppColors.inkMuted),
+                                    Icon(Icons.timer_outlined,
+                                        size: 14, color: AppColors.inkMuted),
                                     SizedBox(width: 4),
-                                    Text('End Time', style: TextStyle(fontSize: 11, color: AppColors.inkMuted, fontWeight: FontWeight.w600)),
+                                    Text('End Time',
+                                        style: TextStyle(
+                                            fontSize: 11,
+                                            color: AppColors.inkMuted,
+                                            fontWeight: FontWeight.w600)),
                                   ],
                                 ),
                                 DropdownButtonHideUnderline(
@@ -4364,7 +5126,10 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                                           value: h,
                                           child: Text(
                                             _formatHourDisplay(h),
-                                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.ink),
+                                            style: const TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w700,
+                                                color: AppColors.ink),
                                           ),
                                         );
                                       }).toList();
@@ -4372,7 +5137,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                                     onChanged: (val) {
                                       if (val != null) {
                                         if (val <= currentStartHour) {
-                                          AppToast.showConflict(context, 'End time must be after start time.');
+                                          AppToast.showConflict(context,
+                                              'End time must be after start time.');
                                           HapticFeedback.heavyImpact();
                                           return;
                                         }
@@ -4392,9 +5158,13 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                                           ignoreEntry: existingEntry,
                                         );
                                         if (conflict != null) {
-                                          final cName = conflict['subject_name'] ?? 'Class';
-                                          final cStart = conflict['start_time'] ?? '';
-                                          final cEnd = conflict['end_time'] ?? '';
+                                          final cName =
+                                              conflict['subject_name'] ??
+                                                  'Class';
+                                          final cStart =
+                                              conflict['start_time'] ?? '';
+                                          final cEnd =
+                                              conflict['end_time'] ?? '';
                                           AppToast.showConflict(
                                             context,
                                             'Time conflict: "$cName" is already scheduled from $cStart to $cEnd.',
@@ -4405,7 +5175,9 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
 
                                         setModalState(() {
                                           currentEndHour = val;
-                                          if (currentEndHour - currentStartHour >= 2) {
+                                          if (currentEndHour -
+                                                  currentStartHour >=
+                                              2) {
                                             classType = 'Practical/Lab';
                                           } else {
                                             classType = 'Theory';
@@ -4428,7 +5200,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                       label: 'Room / Lab / Hall (Optional)',
                       controller: roomCtrl,
                       hint: 'e.g. Room 101, CS Lab 2',
-                      prefixIcon: const Icon(Icons.meeting_room_outlined, size: 20, color: AppColors.inkMuted),
+                      prefixIcon: const Icon(Icons.meeting_room_outlined,
+                          size: 20, color: AppColors.inkMuted),
                     ),
                     const SizedBox(height: 20),
 
@@ -4439,11 +5212,15 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                           child: OutlinedButton(
                             style: OutlinedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
                               side: const BorderSide(color: AppColors.divider),
                             ),
                             onPressed: () => Navigator.pop(ctx),
-                            child: const Text('Cancel', style: TextStyle(color: AppColors.inkMuted, fontWeight: FontWeight.w600)),
+                            child: const Text('Cancel',
+                                style: TextStyle(
+                                    color: AppColors.inkMuted,
+                                    fontWeight: FontWeight.w600)),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -4455,16 +5232,25 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 14),
                               elevation: 0,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
                             ),
-                            icon: Icon(existingEntry != null ? Icons.check_rounded : Icons.add_rounded, size: 18),
+                            icon: Icon(
+                                existingEntry != null
+                                    ? Icons.check_rounded
+                                    : Icons.add_rounded,
+                                size: 18),
                             label: Text(
-                              existingEntry != null ? 'Update Slot' : 'Add Slot',
-                              style: const TextStyle(fontWeight: FontWeight.w700),
+                              existingEntry != null
+                                  ? 'Update Slot'
+                                  : 'Add Slot',
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w700),
                             ),
                             onPressed: () {
                               if (currentStartHour >= currentEndHour) {
-                                AppToast.showConflict(context, 'End time must be after start time.');
+                                AppToast.showConflict(context,
+                                    'End time must be after start time.');
                                 HapticFeedback.heavyImpact();
                                 return;
                               }
@@ -4485,7 +5271,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                                 ignoreEntry: existingEntry,
                               );
                               if (conflict != null) {
-                                final cName = conflict['subject_name'] ?? 'Class';
+                                final cName =
+                                    conflict['subject_name'] ?? 'Class';
                                 final cStart = conflict['start_time'] ?? '';
                                 final cEnd = conflict['end_time'] ?? '';
                                 AppToast.showConflict(
@@ -4496,16 +5283,23 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                                 return;
                               }
 
-                              final startTimeStr = _formatHourString(currentStartHour);
-                              final endTimeStr = _formatHourString(currentEndHour);
+                              final startTimeStr =
+                                  _formatHourString(currentStartHour);
+                              final endTimeStr =
+                                  _formatHourString(currentEndHour);
                               final roomVal = roomCtrl.text.trim();
 
-                              final effectiveClassType = (selectedSubject == 'Break Time') ? 'Break' : classType;
+                              final effectiveClassType =
+                                  (selectedSubject == 'Break Time')
+                                      ? 'Break'
+                                      : classType;
 
                               setState(() {
                                 if (existingEntry != null) {
-                                  existingEntry['subject_name'] = selectedSubject;
-                                  existingEntry['class_type'] = effectiveClassType;
+                                  existingEntry['subject_name'] =
+                                      selectedSubject;
+                                  existingEntry['class_type'] =
+                                      effectiveClassType;
                                   existingEntry['start_time'] = startTimeStr;
                                   existingEntry['end_time'] = endTimeStr;
                                   existingEntry['room'] = roomVal;
@@ -4547,8 +5341,9 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildStepHeader(
-            title: 'Academic Calendar',
-            subtitle: 'Holidays and academic breaks are excluded from attendance denominator so your record stays 100% accurate.',
+            title: 'Academic Holidays',
+            subtitle:
+                'Holidays and academic breaks are excluded from attendance denominator so your record stays 100% accurate.',
             trailing: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
@@ -4557,7 +5352,10 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
               ),
               child: Text(
                 '${_holidays.length} Events',
-                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: AppColors.amber),
+                style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    color: AppColors.amber),
               ),
             ),
           ),
@@ -4588,7 +5386,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                         color: AppColors.amber.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(Icons.event_outlined, color: AppColors.amber, size: 18),
+                      child: const Icon(Icons.event_outlined,
+                          color: AppColors.amber, size: 18),
                     ),
                     const SizedBox(width: 10),
                     const Expanded(
@@ -4597,12 +5396,16 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                         children: [
                           Text(
                             'Add Event',
-                            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.ink),
+                            style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                                color: AppColors.ink),
                           ),
                           SizedBox(height: 2),
                           Text(
                             'Schedule holidays, festivals, study breaks or closures',
-                            style: TextStyle(fontSize: 11, color: AppColors.inkMuted),
+                            style: TextStyle(
+                                fontSize: 11, color: AppColors.inkMuted),
                           ),
                         ],
                       ),
@@ -4615,7 +5418,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                   label: 'Event Title',
                   controller: _holidayTitleCtrl,
                   hint: 'e.g. Diwali Break, Foundation Day',
-                  prefixIcon: const Icon(Icons.celebration_outlined, size: 20, color: AppColors.inkMuted),
+                  prefixIcon: const Icon(Icons.celebration_outlined,
+                      size: 20, color: AppColors.inkMuted),
                   onTapOutside: (_) {
                     FocusScope.of(context).unfocus();
                     _saveDraft();
@@ -4641,16 +5445,24 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Duration', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.ink)),
+                          const Text('Duration',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.ink)),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2.5),
                             decoration: BoxDecoration(
                               color: AppColors.amber.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
                               '${_holidayEndDate.difference(_holidayStartDate).inDays + 1} Day${_holidayEndDate.difference(_holidayStartDate).inDays == 0 ? '' : 's'}',
-                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.amber),
+                              style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.amber),
                             ),
                           ),
                         ],
@@ -4672,7 +5484,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                                 if (picked != null) {
                                   setState(() {
                                     _holidayStartDate = picked;
-                                    if (_holidayEndDate.isBefore(_holidayStartDate)) {
+                                    if (_holidayEndDate
+                                        .isBefore(_holidayStartDate)) {
                                       _holidayEndDate = _holidayStartDate;
                                     }
                                   });
@@ -4680,7 +5493,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                                 }
                               },
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 8),
                                 decoration: BoxDecoration(
                                   color: AppColors.surface,
                                   borderRadius: BorderRadius.circular(10),
@@ -4691,15 +5505,25 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                                   children: [
                                     const Row(
                                       children: [
-                                        Icon(Icons.calendar_today_rounded, size: 11, color: AppColors.terracotta),
+                                        Icon(Icons.calendar_today_rounded,
+                                            size: 11,
+                                            color: AppColors.terracotta),
                                         SizedBox(width: 4),
-                                        Text('Starts On', style: TextStyle(fontSize: 10.5, color: AppColors.inkMuted, fontWeight: FontWeight.w600)),
+                                        Text('Starts On',
+                                            style: TextStyle(
+                                                fontSize: 10.5,
+                                                color: AppColors.inkMuted,
+                                                fontWeight: FontWeight.w600)),
                                       ],
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      DateFormat('dd MMM yyyy').format(_holidayStartDate),
-                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink),
+                                      DateFormat('dd MMM yyyy')
+                                          .format(_holidayStartDate),
+                                      style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppColors.ink),
                                     ),
                                   ],
                                 ),
@@ -4708,7 +5532,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                           ),
                           const Padding(
                             padding: EdgeInsets.symmetric(horizontal: 6),
-                            child: Icon(Icons.arrow_forward_rounded, size: 16, color: AppColors.inkMuted),
+                            child: Icon(Icons.arrow_forward_rounded,
+                                size: 16, color: AppColors.inkMuted),
                           ),
                           // End Date
                           Expanded(
@@ -4727,7 +5552,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                                 }
                               },
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 8),
                                 decoration: BoxDecoration(
                                   color: AppColors.surface,
                                   borderRadius: BorderRadius.circular(10),
@@ -4738,15 +5564,25 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                                   children: [
                                     const Row(
                                       children: [
-                                        Icon(Icons.event_available_rounded, size: 11, color: AppColors.terracotta),
+                                        Icon(Icons.event_available_rounded,
+                                            size: 11,
+                                            color: AppColors.terracotta),
                                         SizedBox(width: 4),
-                                        Text('Ends On', style: TextStyle(fontSize: 10.5, color: AppColors.inkMuted, fontWeight: FontWeight.w600)),
+                                        Text('Ends On',
+                                            style: TextStyle(
+                                                fontSize: 10.5,
+                                                color: AppColors.inkMuted,
+                                                fontWeight: FontWeight.w600)),
                                       ],
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      DateFormat('dd MMM yyyy').format(_holidayEndDate),
-                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink),
+                                      DateFormat('dd MMM yyyy')
+                                          .format(_holidayEndDate),
+                                      style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppColors.ink),
                                     ),
                                   ],
                                 ),
@@ -4767,15 +5603,21 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                       backgroundColor: AppColors.terracotta,
                       foregroundColor: Colors.white,
                       elevation: 0,
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 18, vertical: 11),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
                     ),
                     icon: const Icon(Icons.add_rounded, size: 18),
-                    label: const Text('Add Event', style: TextStyle(fontWeight: FontWeight.w700)),
+                    label: const Text('Add Event',
+                        style: TextStyle(fontWeight: FontWeight.w700)),
                     onPressed: () {
                       final title = _holidayTitleCtrl.text.trim();
                       if (title.isNotEmpty) {
                         setState(() {
+                          _holidays.removeWhere((h) =>
+                              h['title'] == 'Diwali Break' ||
+                              h['title'] == 'Mid-Term Break');
                           _holidays.add({
                             'title': title,
                             'start_date': _holidayStartDate,
@@ -4801,11 +5643,16 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   children: [
-                    Icon(Icons.event_busy_outlined, size: 40, color: AppColors.inkMuted.withValues(alpha: 0.5)),
+                    Icon(Icons.event_busy_outlined,
+                        size: 40,
+                        color: AppColors.inkMuted.withValues(alpha: 0.5)),
                     const SizedBox(height: 8),
                     const Text(
                       'No events scheduled yet',
-                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.ink),
+                      style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: AppColors.ink),
                     ),
                     const SizedBox(height: 4),
                     const Text(
@@ -4861,7 +5708,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                               color: AppColors.amber.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: const Icon(Icons.celebration_rounded, color: AppColors.amber, size: 18),
+                            child: const Icon(Icons.celebration_rounded,
+                                color: AppColors.amber, size: 18),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -4870,7 +5718,10 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                               children: [
                                 Text(
                                   h['title'] as String,
-                                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5, color: AppColors.ink),
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14.5,
+                                      color: AppColors.ink),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -4879,19 +5730,27 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                                   children: [
                                     Text(
                                       '$sStr – $eStr',
-                                      style: const TextStyle(fontSize: 11, color: AppColors.inkMuted, fontWeight: FontWeight.w500),
+                                      style: const TextStyle(
+                                          fontSize: 11,
+                                          color: AppColors.inkMuted,
+                                          fontWeight: FontWeight.w500),
                                     ),
                                     const SizedBox(width: 6),
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 6, vertical: 1.5),
                                       decoration: BoxDecoration(
                                         color: AppColors.surfaceAlt,
                                         borderRadius: BorderRadius.circular(4),
-                                        border: Border.all(color: AppColors.divider),
+                                        border: Border.all(
+                                            color: AppColors.divider),
                                       ),
                                       child: Text(
                                         '$durationDays Day${durationDays == 1 ? '' : 's'}',
-                                        style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: AppColors.ink),
+                                        style: const TextStyle(
+                                            fontSize: 9.5,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppColors.ink),
                                       ),
                                     ),
                                   ],
@@ -4900,7 +5759,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                             ),
                           ),
                           IconButton(
-                            icon: const Icon(Icons.delete_outline_rounded, color: AppColors.coral, size: 20),
+                            icon: const Icon(Icons.delete_outline_rounded,
+                                color: AppColors.coral, size: 20),
                             onPressed: () {
                               setState(() => _holidays.removeAt(idx));
                               _saveDraft();
@@ -4928,20 +5788,25 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
         children: [
           _buildStepHeader(
             title: 'Past Attendance Records',
-            subtitle: 'Starting AttendiFy mid-semester? Enter your verified attended and conducted totals. If you are starting fresh, leave all as 0.',
+            subtitle:
+                'Starting AttendiFy mid-semester? Enter your verified attended and conducted totals. If you are starting fresh, leave all as 0.',
           ),
-
           if (_subjects.isEmpty)
             Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   children: [
-                    Icon(Icons.fact_check_outlined, size: 40, color: AppColors.inkMuted.withValues(alpha: 0.5)),
+                    Icon(Icons.fact_check_outlined,
+                        size: 40,
+                        color: AppColors.inkMuted.withValues(alpha: 0.5)),
                     const SizedBox(height: 8),
                     const Text(
                       'No subjects enrolled',
-                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.ink),
+                      style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: AppColors.ink),
                     ),
                     const SizedBox(height: 4),
                     const Text(
@@ -5001,22 +5866,32 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                                     Flexible(
                                       child: Text(
                                         name,
-                                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5, color: AppColors.ink),
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 14.5,
+                                            color: AppColors.ink),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
-                                    if (code != null && code.trim().isNotEmpty) ...[
+                                    if (code != null &&
+                                        code.trim().isNotEmpty) ...[
                                       const SizedBox(width: 6),
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 6, vertical: 1.5),
                                         decoration: BoxDecoration(
-                                          color: subColor.withValues(alpha: 0.12),
-                                          borderRadius: BorderRadius.circular(4),
+                                          color:
+                                              subColor.withValues(alpha: 0.12),
+                                          borderRadius:
+                                              BorderRadius.circular(4),
                                         ),
                                         child: Text(
                                           code.trim(),
-                                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: subColor),
+                                          style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w700,
+                                              color: subColor),
                                         ),
                                       ),
                                     ],
@@ -5025,25 +5900,38 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                               ),
                               const SizedBox(width: 8),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
                                 decoration: BoxDecoration(
                                   color: hasData
-                                      ? (isAboveTarget ? AppColors.sage.withValues(alpha: 0.15) : AppColors.coral.withValues(alpha: 0.15))
+                                      ? (isAboveTarget
+                                          ? AppColors.sage
+                                              .withValues(alpha: 0.15)
+                                          : AppColors.coral
+                                              .withValues(alpha: 0.15))
                                       : AppColors.surfaceAlt,
                                   borderRadius: BorderRadius.circular(8),
                                   border: Border.all(
                                     color: hasData
-                                        ? (isAboveTarget ? AppColors.sage.withValues(alpha: 0.3) : AppColors.coral.withValues(alpha: 0.3))
+                                        ? (isAboveTarget
+                                            ? AppColors.sage
+                                                .withValues(alpha: 0.3)
+                                            : AppColors.coral
+                                                .withValues(alpha: 0.3))
                                         : AppColors.divider,
                                   ),
                                 ),
                                 child: Text(
-                                  hasData ? '${pct.toStringAsFixed(1)}%' : 'No records yet',
+                                  hasData
+                                      ? '${pct.toStringAsFixed(1)}%'
+                                      : 'No records yet',
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w700,
                                     color: hasData
-                                        ? (isAboveTarget ? AppColors.sage : AppColors.coral)
+                                        ? (isAboveTarget
+                                            ? AppColors.sage
+                                            : AppColors.coral)
                                         : AppColors.inkMuted,
                                   ),
                                 ),
@@ -5054,7 +5942,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
 
                           // Line 1: Classes Attended (Separate Line)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 8),
                             decoration: BoxDecoration(
                               color: AppColors.surfaceAlt,
                               borderRadius: BorderRadius.circular(10),
@@ -5062,24 +5951,31 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.check_circle_outline_rounded, size: 16, color: AppColors.sage),
+                                const Icon(Icons.check_circle_outline_rounded,
+                                    size: 16, color: AppColors.sage),
                                 const SizedBox(width: 8),
                                 const Expanded(
                                   child: Text(
                                     'Classes Attended',
-                                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.ink),
+                                    style: TextStyle(
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.ink),
                                   ),
                                 ),
                                 // Stepper decrement button
                                 InkWell(
-                                  onTap: att > 0 ? () {
-                                    final nAtt = att - 1;
-                                    setState(() {
-                                      _startingAttended[name] = nAtt;
-                                      _attendedControllers[name]?.text = nAtt.toString();
-                                    });
-                                    _saveDraft();
-                                  } : null,
+                                  onTap: att > 0
+                                      ? () {
+                                          final nAtt = att - 1;
+                                          setState(() {
+                                            _startingAttended[name] = nAtt;
+                                            _attendedControllers[name]?.text =
+                                                nAtt.toString();
+                                          });
+                                          _saveDraft();
+                                        }
+                                      : null,
                                   borderRadius: BorderRadius.circular(6),
                                   child: Container(
                                     width: 32,
@@ -5088,9 +5984,14 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                                     decoration: BoxDecoration(
                                       color: AppColors.surface,
                                       borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: AppColors.divider),
+                                      border:
+                                          Border.all(color: AppColors.divider),
                                     ),
-                                    child: Icon(Icons.remove_rounded, size: 16, color: att > 0 ? AppColors.ink : AppColors.inkMuted),
+                                    child: Icon(Icons.remove_rounded,
+                                        size: 16,
+                                        color: att > 0
+                                            ? AppColors.ink
+                                            : AppColors.inkMuted),
                                   ),
                                 ),
                                 const SizedBox(width: 6),
@@ -5099,27 +6000,53 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                                   width: 54,
                                   height: 34,
                                   child: TextFormField(
-                                    controller: _getAttendedController(name, att),
+                                    controller:
+                                        _getAttendedController(name, att),
                                     keyboardType: TextInputType.number,
                                     textAlign: TextAlign.center,
-                                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5, color: AppColors.ink),
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 13.5,
+                                        color: AppColors.ink),
                                     decoration: InputDecoration(
                                       isDense: true,
-                                      contentPadding: const EdgeInsets.symmetric(vertical: 7),
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                              vertical: 7),
                                       filled: true,
                                       fillColor: AppColors.surface,
-                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: AppColors.divider)),
-                                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: AppColors.divider)),
-                                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: AppColors.terracotta, width: 1.5)),
+                                      border: OutlineInputBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                          borderSide: const BorderSide(
+                                              color: AppColors.divider)),
+                                      enabledBorder: OutlineInputBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                          borderSide: const BorderSide(
+                                              color: AppColors.divider)),
+                                      focusedBorder: OutlineInputBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                          borderSide: const BorderSide(
+                                              color: AppColors.terracotta,
+                                              width: 1.5)),
                                     ),
                                     onChanged: (val) {
-                                      final parsed = int.tryParse(val.trim()) ?? 0;
+                                      final parsed =
+                                          int.tryParse(val.trim()) ?? 0;
                                       setState(() {
-                                        _startingAttended[name] = parsed.clamp(0, 9999);
-                                        final curCond = _startingConducted[name] ?? 0;
-                                        if (curCond < _startingAttended[name]!) {
-                                          _startingConducted[name] = _startingAttended[name]!;
-                                          _conductedControllers[name]?.text = _startingAttended[name]!.toString();
+                                        _startingAttended[name] =
+                                            parsed.clamp(0, 9999);
+                                        final curCond =
+                                            _startingConducted[name] ?? 0;
+                                        if (curCond <
+                                            _startingAttended[name]!) {
+                                          _startingConducted[name] =
+                                              _startingAttended[name]!;
+                                          _conductedControllers[name]?.text =
+                                              _startingAttended[name]!
+                                                  .toString();
                                         }
                                       });
                                       _saveDraft();
@@ -5133,11 +6060,14 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                                     final nAtt = att + 1;
                                     setState(() {
                                       _startingAttended[name] = nAtt;
-                                      _attendedControllers[name]?.text = nAtt.toString();
-                                      final curCond = _startingConducted[name] ?? 0;
+                                      _attendedControllers[name]?.text =
+                                          nAtt.toString();
+                                      final curCond =
+                                          _startingConducted[name] ?? 0;
                                       if (curCond < nAtt) {
                                         _startingConducted[name] = nAtt;
-                                        _conductedControllers[name]?.text = nAtt.toString();
+                                        _conductedControllers[name]?.text =
+                                            nAtt.toString();
                                       }
                                     });
                                     _saveDraft();
@@ -5150,9 +6080,11 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                                     decoration: BoxDecoration(
                                       color: AppColors.surface,
                                       borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: AppColors.divider),
+                                      border:
+                                          Border.all(color: AppColors.divider),
                                     ),
-                                    child: const Icon(Icons.add_rounded, size: 16, color: AppColors.sage),
+                                    child: const Icon(Icons.add_rounded,
+                                        size: 16, color: AppColors.sage),
                                   ),
                                 ),
                               ],
@@ -5162,7 +6094,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
 
                           // Line 2: Classes Conducted (Separate Line)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 8),
                             decoration: BoxDecoration(
                               color: AppColors.surfaceAlt,
                               borderRadius: BorderRadius.circular(10),
@@ -5170,24 +6103,31 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.event_note_rounded, size: 16, color: AppColors.terracotta),
+                                const Icon(Icons.event_note_rounded,
+                                    size: 16, color: AppColors.terracotta),
                                 const SizedBox(width: 8),
                                 const Expanded(
                                   child: Text(
                                     'Classes Conducted',
-                                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.ink),
+                                    style: TextStyle(
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.ink),
                                   ),
                                 ),
                                 // Stepper decrement button
                                 InkWell(
-                                  onTap: cond > att ? () {
-                                    final nCond = cond - 1;
-                                    setState(() {
-                                      _startingConducted[name] = nCond;
-                                      _conductedControllers[name]?.text = nCond.toString();
-                                    });
-                                    _saveDraft();
-                                  } : null,
+                                  onTap: cond > att
+                                      ? () {
+                                          final nCond = cond - 1;
+                                          setState(() {
+                                            _startingConducted[name] = nCond;
+                                            _conductedControllers[name]?.text =
+                                                nCond.toString();
+                                          });
+                                          _saveDraft();
+                                        }
+                                      : null,
                                   borderRadius: BorderRadius.circular(6),
                                   child: Container(
                                     width: 32,
@@ -5196,9 +6136,14 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                                     decoration: BoxDecoration(
                                       color: AppColors.surface,
                                       borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: AppColors.divider),
+                                      border:
+                                          Border.all(color: AppColors.divider),
                                     ),
-                                    child: Icon(Icons.remove_rounded, size: 16, color: cond > att ? AppColors.ink : AppColors.inkMuted),
+                                    child: Icon(Icons.remove_rounded,
+                                        size: 16,
+                                        color: cond > att
+                                            ? AppColors.ink
+                                            : AppColors.inkMuted),
                                   ),
                                 ),
                                 const SizedBox(width: 6),
@@ -5207,27 +6152,51 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                                   width: 54,
                                   height: 34,
                                   child: TextFormField(
-                                    controller: _getConductedController(name, cond),
+                                    controller:
+                                        _getConductedController(name, cond),
                                     keyboardType: TextInputType.number,
                                     textAlign: TextAlign.center,
-                                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5, color: AppColors.ink),
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 13.5,
+                                        color: AppColors.ink),
                                     decoration: InputDecoration(
                                       isDense: true,
-                                      contentPadding: const EdgeInsets.symmetric(vertical: 7),
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                              vertical: 7),
                                       filled: true,
                                       fillColor: AppColors.surface,
-                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: AppColors.divider)),
-                                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: AppColors.divider)),
-                                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: AppColors.terracotta, width: 1.5)),
+                                      border: OutlineInputBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                          borderSide: const BorderSide(
+                                              color: AppColors.divider)),
+                                      enabledBorder: OutlineInputBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                          borderSide: const BorderSide(
+                                              color: AppColors.divider)),
+                                      focusedBorder: OutlineInputBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                          borderSide: const BorderSide(
+                                              color: AppColors.terracotta,
+                                              width: 1.5)),
                                     ),
                                     onChanged: (val) {
-                                      final parsed = int.tryParse(val.trim()) ?? 0;
+                                      final parsed =
+                                          int.tryParse(val.trim()) ?? 0;
                                       setState(() {
-                                        _startingConducted[name] = parsed.clamp(0, 9999);
-                                        final curAtt = _startingAttended[name] ?? 0;
-                                        if (_startingConducted[name]! < curAtt) {
+                                        _startingConducted[name] =
+                                            parsed.clamp(0, 9999);
+                                        final curAtt =
+                                            _startingAttended[name] ?? 0;
+                                        if (_startingConducted[name]! <
+                                            curAtt) {
                                           _startingConducted[name] = curAtt;
-                                          _conductedControllers[name]?.text = curAtt.toString();
+                                          _conductedControllers[name]?.text =
+                                              curAtt.toString();
                                         }
                                       });
                                       _saveDraft();
@@ -5241,7 +6210,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                                     final nCond = cond + 1;
                                     setState(() {
                                       _startingConducted[name] = nCond;
-                                      _conductedControllers[name]?.text = nCond.toString();
+                                      _conductedControllers[name]?.text =
+                                          nCond.toString();
                                     });
                                     _saveDraft();
                                   },
@@ -5253,9 +6223,11 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                                     decoration: BoxDecoration(
                                       color: AppColors.surface,
                                       borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: AppColors.divider),
+                                      border:
+                                          Border.all(color: AppColors.divider),
                                     ),
-                                    child: const Icon(Icons.add_rounded, size: 16, color: AppColors.terracotta),
+                                    child: const Icon(Icons.add_rounded,
+                                        size: 16, color: AppColors.terracotta),
                                   ),
                                 ),
                               ],
@@ -5282,7 +6254,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
         children: [
           _buildStepHeader(
             title: 'Review Academic Configuration',
-            subtitle: 'Confirm all details before activating your semester. Tap edit on any section to adjust settings.',
+            subtitle:
+                'Confirm all details before activating your semester. Tap edit on any section to adjust settings.',
           ),
 
           // 1. Top Metrics Quick Grid (4 Cards - Strictly Equal Height & Unified)
@@ -5292,23 +6265,36 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
               children: [
                 Expanded(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
                     decoration: BoxDecoration(
                       color: AppColors.surface,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(color: AppColors.divider),
                       boxShadow: const [
-                        BoxShadow(color: AppColors.shadowWarm, blurRadius: 4, offset: Offset(0, 1)),
+                        BoxShadow(
+                            color: AppColors.shadowWarm,
+                            blurRadius: 4,
+                            offset: Offset(0, 1)),
                       ],
                     ),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text('${_subjects.length}', style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: AppColors.terracotta)),
+                        Text('${_subjects.length}',
+                            style: const TextStyle(
+                                fontSize: 19,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.terracotta)),
                         const SizedBox(height: 3),
                         const FittedBox(
                           fit: BoxFit.scaleDown,
-                          child: Text('Subjects', maxLines: 1, style: TextStyle(fontSize: 11, color: AppColors.inkMuted, fontWeight: FontWeight.w600)),
+                          child: Text('Subjects',
+                              maxLines: 1,
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.inkMuted,
+                                  fontWeight: FontWeight.w600)),
                         ),
                       ],
                     ),
@@ -5317,23 +6303,36 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                 const SizedBox(width: 8),
                 Expanded(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
                     decoration: BoxDecoration(
                       color: AppColors.surface,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(color: AppColors.divider),
                       boxShadow: const [
-                        BoxShadow(color: AppColors.shadowWarm, blurRadius: 4, offset: Offset(0, 1)),
+                        BoxShadow(
+                            color: AppColors.shadowWarm,
+                            blurRadius: 4,
+                            offset: Offset(0, 1)),
                       ],
                     ),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text('${_timetableEntries.length}', style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: AppColors.ocean)),
+                        Text('${_timetableEntries.length}',
+                            style: const TextStyle(
+                                fontSize: 19,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.ocean)),
                         const SizedBox(height: 3),
                         const FittedBox(
                           fit: BoxFit.scaleDown,
-                          child: Text('Weekly Slots', maxLines: 1, style: TextStyle(fontSize: 11, color: AppColors.inkMuted, fontWeight: FontWeight.w600)),
+                          child: Text('Weekly Slots',
+                              maxLines: 1,
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.inkMuted,
+                                  fontWeight: FontWeight.w600)),
                         ),
                       ],
                     ),
@@ -5342,23 +6341,36 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                 const SizedBox(width: 8),
                 Expanded(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
                     decoration: BoxDecoration(
                       color: AppColors.surface,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(color: AppColors.divider),
                       boxShadow: const [
-                        BoxShadow(color: AppColors.shadowWarm, blurRadius: 4, offset: Offset(0, 1)),
+                        BoxShadow(
+                            color: AppColors.shadowWarm,
+                            blurRadius: 4,
+                            offset: Offset(0, 1)),
                       ],
                     ),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text('${_holidays.length}', style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: AppColors.amber)),
+                        Text('${_holidays.length}',
+                            style: const TextStyle(
+                                fontSize: 19,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.amber)),
                         const SizedBox(height: 3),
                         const FittedBox(
                           fit: BoxFit.scaleDown,
-                          child: Text('Events', maxLines: 1, style: TextStyle(fontSize: 11, color: AppColors.inkMuted, fontWeight: FontWeight.w600)),
+                          child: Text('Events',
+                              maxLines: 1,
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.inkMuted,
+                                  fontWeight: FontWeight.w600)),
                         ),
                       ],
                     ),
@@ -5367,23 +6379,36 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                 const SizedBox(width: 8),
                 Expanded(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
                     decoration: BoxDecoration(
                       color: AppColors.surface,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(color: AppColors.divider),
                       boxShadow: const [
-                        BoxShadow(color: AppColors.shadowWarm, blurRadius: 4, offset: Offset(0, 1)),
+                        BoxShadow(
+                            color: AppColors.shadowWarm,
+                            blurRadius: 4,
+                            offset: Offset(0, 1)),
                       ],
                     ),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text('${_personalTarget.toStringAsFixed(0)}%', style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: AppColors.sage)),
+                        Text('${_personalTarget.toStringAsFixed(0)}%',
+                            style: const TextStyle(
+                                fontSize: 19,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.sage)),
                         const SizedBox(height: 3),
                         const FittedBox(
                           fit: BoxFit.scaleDown,
-                          child: Text('Target Goal', maxLines: 1, style: TextStyle(fontSize: 11, color: AppColors.inkMuted, fontWeight: FontWeight.w600)),
+                          child: Text('Target Goal',
+                              maxLines: 1,
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.inkMuted,
+                                  fontWeight: FontWeight.w600)),
                         ),
                       ],
                     ),
@@ -5402,7 +6427,10 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: AppColors.divider),
               boxShadow: const [
-                BoxShadow(color: AppColors.shadowWarm, blurRadius: 4, offset: Offset(0, 1)),
+                BoxShadow(
+                    color: AppColors.shadowWarm,
+                    blurRadius: 4,
+                    offset: Offset(0, 1)),
               ],
             ),
             child: Column(
@@ -5413,40 +6441,65 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                   children: [
                     const Row(
                       children: [
-                        Icon(Icons.person_pin_rounded, color: AppColors.terracotta, size: 18),
+                        Icon(Icons.person_pin_rounded,
+                            color: AppColors.terracotta, size: 18),
                         SizedBox(width: 8),
-                        Text('Academic Profile', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.ink)),
+                        Text('Academic Profile',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                                color: AppColors.ink)),
                       ],
                     ),
                     if (!_isReturningUser)
                       IconButton(
-                        icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.terracotta),
+                        icon: const Icon(Icons.edit_outlined,
+                            size: 18, color: AppColors.terracotta),
                         onPressed: () => _goToStep(0),
                         tooltip: 'Edit Profile',
                       )
                     else
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
                           color: AppColors.sageLight,
                           borderRadius: BorderRadius.circular(6),
                         ),
-                        child: const Text('Profile Active', style: TextStyle(color: AppColors.sageDark, fontSize: 11, fontWeight: FontWeight.w700)),
+                        child: const Text('Profile Active',
+                            style: TextStyle(
+                                color: AppColors.sageDark,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700)),
                       ),
                   ],
                 ),
                 const Divider(color: AppColors.divider, height: 16),
-                _buildReviewDetailRow('Student Name', _fullNameCtrl.text.isEmpty ? 'Not specified' : _fullNameCtrl.text),
+                _buildReviewDetailRow(
+                    'Student Name',
+                    _fullNameCtrl.text.isEmpty
+                        ? 'Not specified'
+                        : _fullNameCtrl.text),
                 const SizedBox(height: 6),
-                _buildReviewDetailRow('Institution', _universityCtrl.text.isEmpty ? 'Not specified' : _universityCtrl.text),
+                _buildReviewDetailRow(
+                    'Institution',
+                    _universityCtrl.text.isEmpty
+                        ? 'Not specified'
+                        : _universityCtrl.text),
                 const SizedBox(height: 6),
-                _buildReviewDetailRow('Program', _courseCtrl.text.isEmpty ? 'Not specified' : _courseCtrl.text),
+                _buildReviewDetailRow(
+                    'Program',
+                    _courseCtrl.text.isEmpty
+                        ? 'Not specified'
+                        : _courseCtrl.text),
                 if (_studentIdCtrl.text.isNotEmpty) ...[
                   const SizedBox(height: 6),
-                  _buildReviewDetailRow('Student ID / Roll', _studentIdCtrl.text),
+                  _buildReviewDetailRow(
+                      'Student ID / Roll', _studentIdCtrl.text),
                 ],
                 const SizedBox(height: 6),
-                _buildReviewDetailRow('Duration & Session', '$_durationYears Years ($_sessionStart–$_sessionEnd)'),
+                _buildReviewDetailRow('Duration & Session',
+                    '$_durationYears Years ($_sessionStart–$_sessionEnd)'),
               ],
             ),
           ),
@@ -5460,7 +6513,10 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: AppColors.divider),
               boxShadow: const [
-                BoxShadow(color: AppColors.shadowWarm, blurRadius: 4, offset: Offset(0, 1)),
+                BoxShadow(
+                    color: AppColors.shadowWarm,
+                    blurRadius: 4,
+                    offset: Offset(0, 1)),
               ],
             ),
             child: Column(
@@ -5471,13 +6527,19 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                   children: [
                     const Row(
                       children: [
-                        Icon(Icons.verified_user_outlined, color: AppColors.terracotta, size: 18),
+                        Icon(Icons.verified_user_outlined,
+                            color: AppColors.terracotta, size: 18),
                         SizedBox(width: 8),
-                        Text('Semester & Rules', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.ink)),
+                        Text('Semester & Rules',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                                color: AppColors.ink)),
                       ],
                     ),
                     IconButton(
-                      icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.terracotta),
+                      icon: const Icon(Icons.edit_outlined,
+                          size: 18, color: AppColors.terracotta),
                       onPressed: () => _goToStep(_isReturningUser ? 0 : 1),
                       tooltip: 'Edit Semester',
                     ),
@@ -5488,12 +6550,12 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                 const SizedBox(height: 6),
                 _buildReviewDetailRow(
                   'Working Schedule',
-                  '$_startDay to $_endDay • ${_formatHourDisplay(_classStartHour)} – ${_formatHourDisplay(_classEndHour)}',
+                  '$_startDay to $_endDay\n${_formatHourDisplay(_classStartHour)} – ${_formatHourDisplay(_classEndHour)}',
                 ),
                 const SizedBox(height: 6),
                 _buildReviewDetailRow(
                   'Attendance Targets',
-                  'Minimum ${_minAttendance.toStringAsFixed(0)}% • Personal Goal ${_personalTarget.toStringAsFixed(0)}%',
+                  'Minimum: ${_minAttendance.toStringAsFixed(0)}%\nPersonal Goal: ${_personalTarget.toStringAsFixed(0)}%',
                   valueColor: AppColors.terracotta,
                 ),
               ],
@@ -5509,7 +6571,10 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: AppColors.divider),
               boxShadow: const [
-                BoxShadow(color: AppColors.shadowWarm, blurRadius: 4, offset: Offset(0, 1)),
+                BoxShadow(
+                    color: AppColors.shadowWarm,
+                    blurRadius: 4,
+                    offset: Offset(0, 1)),
               ],
             ),
             child: Column(
@@ -5520,13 +6585,19 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.menu_book_rounded, color: AppColors.terracotta, size: 18),
+                        const Icon(Icons.menu_book_rounded,
+                            color: AppColors.terracotta, size: 18),
                         const SizedBox(width: 8),
-                        Text('Enrolled Subjects (${_subjects.length})', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.ink)),
+                        Text('Enrolled Subjects (${_subjects.length})',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                                color: AppColors.ink)),
                       ],
                     ),
                     IconButton(
-                      icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.terracotta),
+                      icon: const Icon(Icons.edit_outlined,
+                          size: 18, color: AppColors.terracotta),
                       onPressed: () => _goToStep(_isReturningUser ? 1 : 2),
                       tooltip: 'Edit Subjects',
                     ),
@@ -5534,7 +6605,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                 ),
                 const Divider(color: AppColors.divider, height: 16),
                 if (_subjects.isEmpty)
-                  const Text('No subjects enrolled yet.', style: TextStyle(fontSize: 12, color: AppColors.inkMuted))
+                  const Text('No subjects enrolled yet.',
+                      style: TextStyle(fontSize: 12, color: AppColors.inkMuted))
                 else
                   Wrap(
                     spacing: 8,
@@ -5543,7 +6615,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                       final sColor = _parseColor(s['color'] as String?);
                       final code = s['code'] as String?;
                       return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
                           color: AppColors.surfaceAlt,
                           borderRadius: BorderRadius.circular(8),
@@ -5552,12 +6625,23 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Container(width: 8, height: 8, decoration: BoxDecoration(color: sColor, shape: BoxShape.circle)),
+                            Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                    color: sColor, shape: BoxShape.circle)),
                             const SizedBox(width: 6),
-                            Text(s['name'] as String, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.ink)),
+                            Text(s['name'] as String,
+                                style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.ink)),
                             if (code != null && code.isNotEmpty) ...[
                               const SizedBox(width: 4),
-                              Text('($code)', style: const TextStyle(fontSize: 10.5, color: AppColors.inkMuted)),
+                              Text('($code)',
+                                  style: const TextStyle(
+                                      fontSize: 10.5,
+                                      color: AppColors.inkMuted)),
                             ],
                           ],
                         ),
@@ -5577,7 +6661,10 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: AppColors.divider),
               boxShadow: const [
-                BoxShadow(color: AppColors.shadowWarm, blurRadius: 4, offset: Offset(0, 1)),
+                BoxShadow(
+                    color: AppColors.shadowWarm,
+                    blurRadius: 4,
+                    offset: Offset(0, 1)),
               ],
             ),
             child: Column(
@@ -5588,13 +6675,20 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.calendar_view_week_rounded, color: AppColors.ocean, size: 18),
+                        const Icon(Icons.calendar_view_week_rounded,
+                            color: AppColors.ocean, size: 18),
                         const SizedBox(width: 8),
-                        Text('Weekly Timetable (${_timetableEntries.length} Slots)', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.ink)),
+                        Text(
+                            'Weekly Timetable (${_timetableEntries.length} Slots)',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                                color: AppColors.ink)),
                       ],
                     ),
                     IconButton(
-                      icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.terracotta),
+                      icon: const Icon(Icons.edit_outlined,
+                          size: 18, color: AppColors.terracotta),
                       onPressed: () => _goToStep(_isReturningUser ? 2 : 3),
                       tooltip: 'Edit Timetable',
                     ),
@@ -5602,12 +6696,16 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                 ),
                 const Divider(color: AppColors.divider, height: 16),
                 if (_timetableEntries.isEmpty)
-                  const Text('No classes scheduled in timetable.', style: TextStyle(fontSize: 12, color: AppColors.inkMuted))
+                  const Text('No classes scheduled in timetable.',
+                      style: TextStyle(fontSize: 12, color: AppColors.inkMuted))
                 else
                   ..._scheduleDays.map((dayName) {
                     final dayIdx = _allDays.indexOf(dayName);
-                    final dayEntries = _timetableEntries.where((t) => t['day_of_week'] == dayIdx).toList()
-                      ..sort((a, b) => (a['start_time'] as String? ?? '').compareTo(b['start_time'] as String? ?? ''));
+                    final dayEntries = _timetableEntries
+                        .where((t) => t['day_of_week'] == dayIdx)
+                        .toList()
+                      ..sort((a, b) => (a['start_time'] as String? ?? '')
+                          .compareTo(b['start_time'] as String? ?? ''));
 
                     if (dayEntries.isEmpty) return const SizedBox.shrink();
 
@@ -5619,35 +6717,44 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                           Row(
                             children: [
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: AppColors.ocean.withValues(alpha: 0.12),
+                                  color:
+                                      AppColors.ocean.withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
                                   dayName,
-                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.ocean),
+                                  style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.ocean),
                                 ),
                               ),
                               const SizedBox(width: 6),
                               Text(
                                 '${dayEntries.length} class${dayEntries.length == 1 ? '' : 'es'}',
-                                style: const TextStyle(fontSize: 11, color: AppColors.inkMuted),
+                                style: const TextStyle(
+                                    fontSize: 11, color: AppColors.inkMuted),
                               ),
                             ],
                           ),
                           const SizedBox(height: 6),
                           ...dayEntries.map((e) {
-                            final subName = e['subject_name'] as String? ?? 'Class';
+                            final subName =
+                                e['subject_name'] as String? ?? 'Class';
                             final sCol = _getSubjectColor(subName);
                             final st = e['start_time'] as String? ?? '';
                             final et = e['end_time'] as String? ?? '';
                             final rm = e['room'] as String?;
-                            final cType = e['class_type'] as String? ?? 'Theory';
+                            final cType =
+                                e['class_type'] as String? ?? 'Theory';
 
                             return Container(
                               margin: const EdgeInsets.only(bottom: 6),
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 8),
                               decoration: BoxDecoration(
                                 color: AppColors.surfaceAlt,
                                 borderRadius: BorderRadius.circular(10),
@@ -5655,17 +6762,31 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                               ),
                               child: Row(
                                 children: [
-                                  Container(width: 3.5, height: 24, decoration: BoxDecoration(color: sCol, borderRadius: BorderRadius.circular(2))),
+                                  Container(
+                                      width: 3.5,
+                                      height: 24,
+                                      decoration: BoxDecoration(
+                                          color: sCol,
+                                          borderRadius:
+                                              BorderRadius.circular(2))),
                                   const SizedBox(width: 8),
                                   Text(
-                                    '$st – $et',
-                                    style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.ink),
+                                    formatSlotRange(st, et,
+                                        is24h: ref.watch(timeFormatProvider) ==
+                                            '24h'),
+                                    style: const TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.ink),
                                   ),
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: Text(
                                       subName,
-                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.ink),
+                                      style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.ink),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -5674,23 +6795,32 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                                     const SizedBox(width: 6),
                                     Text(
                                       rm,
-                                      style: const TextStyle(fontSize: 11, color: AppColors.inkMuted),
+                                      style: const TextStyle(
+                                          fontSize: 11,
+                                          color: AppColors.inkMuted),
                                     ),
                                   ],
                                   const SizedBox(width: 6),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 5, vertical: 1.5),
                                     decoration: BoxDecoration(
-                                      color: cType == 'Break' ? AppColors.amber.withValues(alpha: 0.15) : AppColors.surface,
+                                      color: cType == 'Break'
+                                          ? AppColors.amber
+                                              .withValues(alpha: 0.15)
+                                          : AppColors.surface,
                                       borderRadius: BorderRadius.circular(4),
-                                      border: Border.all(color: AppColors.divider),
+                                      border:
+                                          Border.all(color: AppColors.divider),
                                     ),
                                     child: Text(
                                       cType,
                                       style: TextStyle(
                                         fontSize: 9,
                                         fontWeight: FontWeight.w700,
-                                        color: cType == 'Break' ? AppColors.amber : AppColors.inkMuted,
+                                        color: cType == 'Break'
+                                            ? AppColors.amber
+                                            : AppColors.inkMuted,
                                       ),
                                     ),
                                   ),
@@ -5715,7 +6845,10 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: AppColors.divider),
               boxShadow: const [
-                BoxShadow(color: AppColors.shadowWarm, blurRadius: 4, offset: Offset(0, 1)),
+                BoxShadow(
+                    color: AppColors.shadowWarm,
+                    blurRadius: 4,
+                    offset: Offset(0, 1)),
               ],
             ),
             child: Column(
@@ -5726,21 +6859,28 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.event_note_rounded, color: AppColors.amber, size: 18),
+                        const Icon(Icons.event_note_rounded,
+                            color: AppColors.amber, size: 18),
                         const SizedBox(width: 8),
-                        Text('Academic Calendar (${_holidays.length} Events)', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.ink)),
+                        Text('Academic Holidays (${_holidays.length} Events)',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                                color: AppColors.ink)),
                       ],
                     ),
                     IconButton(
-                      icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.terracotta),
+                      icon: const Icon(Icons.edit_outlined,
+                          size: 18, color: AppColors.terracotta),
                       onPressed: () => _goToStep(_isReturningUser ? 3 : 4),
-                      tooltip: 'Edit Calendar',
+                      tooltip: 'Edit Holidays',
                     ),
                   ],
                 ),
                 const Divider(color: AppColors.divider, height: 16),
                 if (_holidays.isEmpty)
-                  const Text('No events or holidays scheduled.', style: TextStyle(fontSize: 12, color: AppColors.inkMuted))
+                  const Text('No events or holidays scheduled.',
+                      style: TextStyle(fontSize: 12, color: AppColors.inkMuted))
                 else
                   ..._holidays.map((h) {
                     final sDate = h['start_date'] as DateTime;
@@ -5749,17 +6889,22 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
                       padding: const EdgeInsets.only(bottom: 6),
                       child: Row(
                         children: [
-                          const Icon(Icons.celebration_rounded, color: AppColors.amber, size: 14),
+                          const Icon(Icons.celebration_rounded,
+                              color: AppColors.amber, size: 14),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               h['title'] as String,
-                              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.ink),
+                              style: const TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.ink),
                             ),
                           ),
                           Text(
                             '${DateFormat('dd MMM').format(sDate)} – ${DateFormat('dd MMM').format(eDate)}',
-                            style: const TextStyle(fontSize: 11, color: AppColors.inkMuted),
+                            style: const TextStyle(
+                                fontSize: 11, color: AppColors.inkMuted),
                           ),
                         ],
                       ),
@@ -5773,13 +6918,18 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen> with 
     );
   }
 
-  Widget _buildReviewDetailRow(String label, String value, {Color? valueColor}) {
+  Widget _buildReviewDetailRow(String label, String value,
+      {Color? valueColor}) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
           width: 130,
-          child: Text(label, style: const TextStyle(fontSize: 12.5, color: AppColors.inkMuted, fontWeight: FontWeight.w500)),
+          child: Text(label,
+              style: const TextStyle(
+                  fontSize: 12.5,
+                  color: AppColors.inkMuted,
+                  fontWeight: FontWeight.w500)),
         ),
         Expanded(
           child: Text(

@@ -92,6 +92,7 @@ GeneratedPluginRegistrant.java
 key.properties
 *.keystore
 *.jks
+!mobile/android/app/upload-keystore.jks
 mobile/android/local.properties
 mobile/android/.gradle/
 mobile/android/captures/

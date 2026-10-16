@@ -59,6 +59,32 @@ class PersistentTopBar extends StatelessWidget {
                 const SizedBox(width: 8),
               ],
 
+              // App Logo beside Title/Subtitle
+              Container(
+                margin: const EdgeInsets.only(right: 10),
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color.fromRGBO(0, 0, 0, 0.06),
+                      blurRadius: 4,
+                      offset: Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.asset(
+                    'assets/images/app_icon.png',
+                    width: 34,
+                    height: 34,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+
               // Center: Title & optional subtitle
               Expanded(
                 child: Column(

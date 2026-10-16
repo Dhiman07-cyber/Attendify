@@ -1,12 +1,14 @@
 from datetime import date, timedelta
-from typing import List, Optional
+from typing import List, Optional, Set
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete, func
+from sqlalchemy import select, update, delete, func, or_, and_
+from sqlalchemy.orm import selectinload
 from fastapi import HTTPException, status
 
 from app.models.user import User
 from app.models.profile import AcademicProfile
 from app.models.semester import Semester
+from app.models.holiday import Holiday
 from app.schemas.profile import (
     AcademicProfileOut, AcademicProfileUpdate,
     SetupSemesterInfo, FullAcademicSetupDataOut,
@@ -76,20 +78,67 @@ async def update_user_profile(db: AsyncSession, user_id: str, data: AcademicProf
     await db.refresh(profile)
     return await get_user_profile(db, user_id)
 
-def _compute_semester_stats(sem: Semester) -> SemesterOut:
+def _compute_semester_stats(sem: Semester, holiday_dates: Optional[Set[date]] = None) -> SemesterOut:
     today = date.today()
-    total_days = max(1, (sem.end_date - sem.start_date).days)
-    
-    if today < sem.start_date:
-        elapsed_days = 0
-        current_week = 0
-        weeks_remaining = sem.total_weeks
-        progress_pct = 0.0
+
+    # 1. Collect holiday dates
+    hol_dates: Set[date] = set(holiday_dates) if holiday_dates is not None else set()
+    if holiday_dates is None:
+        try:
+            if sem.holidays:
+                for h in sem.holidays:
+                    cur = h.start_date
+                    while cur <= h.end_date:
+                        hol_dates.add(cur)
+                        cur += timedelta(days=1)
+        except Exception:
+            pass
+
+    # 2. Allowed working days of week (0=Mon, ..., 6=Sun)
+    allowed_weekdays = set(sem.working_days) if sem.working_days else {0, 1, 2, 3, 4, 5}
+
+    # 3. Iterate from sem.start_date to sem.end_date to calculate academic working days
+    total_working_days = 0
+    elapsed_working_days = 0
+    remaining_working_days = 0
+
+    if sem.start_date and sem.end_date and sem.start_date <= sem.end_date:
+        cur = sem.start_date
+        while cur <= sem.end_date:
+            is_working_day = (cur.weekday() in allowed_weekdays) and (cur not in hol_dates)
+            if is_working_day:
+                total_working_days += 1
+                if cur < today:
+                    elapsed_working_days += 1
+                else:
+                    remaining_working_days += 1
+            cur += timedelta(days=1)
+
+    # 4. Progress percentage based on actual academic days
+    if total_working_days > 0:
+        if today < sem.start_date:
+            progress_pct = 0.0
+        elif today > sem.end_date:
+            progress_pct = 100.0
+        else:
+            progress_pct = round(min(100.0, (elapsed_working_days / total_working_days) * 100.0), 1)
     else:
-        elapsed_days = max(0, min(total_days, (today - sem.start_date).days))
-        current_week = min(sem.total_weeks, max(1, (elapsed_days // 7) + 1))
-        weeks_remaining = max(0, sem.total_weeks - current_week)
-        progress_pct = round(min(100.0, (elapsed_days / total_days) * 100.0), 1)
+        progress_pct = 100.0 if today >= sem.end_date else 0.0
+
+    # 5. Weeks calculation based on academic working schedule
+    days_per_week = max(1, len(allowed_weekdays))
+    computed_total_weeks = max(1, (total_working_days + days_per_week - 1) // days_per_week)
+    total_weeks = sem.total_weeks if (sem.total_weeks and sem.total_weeks > 0) else computed_total_weeks
+
+    if today < sem.start_date:
+        current_week = 0
+        weeks_remaining = total_weeks
+    elif today > sem.end_date:
+        current_week = total_weeks
+        weeks_remaining = 0
+    else:
+        current_week = min(total_weeks, max(1, (elapsed_working_days // days_per_week) + 1))
+        weeks_remaining = max(0, total_weeks - current_week)
 
     return SemesterOut(
         id=sem.id,
@@ -100,26 +149,42 @@ def _compute_semester_stats(sem: Semester) -> SemesterOut:
         end_date=sem.end_date,
         status=sem.status,
         is_active=sem.is_active,
-        total_weeks=sem.total_weeks,
+        total_weeks=total_weeks,
         working_days=sem.working_days,  # Use property to get list
+        class_start_hour=sem.class_start_hour or 9,
+        class_end_hour=sem.class_end_hour or 16,
         current_week=current_week,
         weeks_remaining=weeks_remaining,
         progress_percentage=progress_pct
     )
 
 async def list_semesters(db: AsyncSession, user_id: str) -> List[SemesterOut]:
-    stmt = select(Semester).where(Semester.user_id == user_id).order_by(Semester.semester_number.asc())
+    stmt = (
+        select(Semester)
+        .options(selectinload(Semester.holidays))
+        .where(Semester.user_id == user_id)
+        .order_by(Semester.semester_number.asc())
+    )
     result = await db.execute(stmt)
     semesters = result.scalars().all()
     return [_compute_semester_stats(s) for s in semesters]
 
 async def get_active_semester(db: AsyncSession, user_id: str) -> Semester:
-    stmt = select(Semester).where(Semester.user_id == user_id, Semester.is_active == True)
+    stmt = (
+        select(Semester)
+        .options(selectinload(Semester.holidays))
+        .where(Semester.user_id == user_id, Semester.is_active == True)
+    )
     result = await db.execute(stmt)
     semester = result.scalar_one_or_none()
     if not semester:
         # Fallback to the latest semester
-        stmt2 = select(Semester).where(Semester.user_id == user_id).order_by(Semester.semester_number.desc())
+        stmt2 = (
+            select(Semester)
+            .options(selectinload(Semester.holidays))
+            .where(Semester.user_id == user_id)
+            .order_by(Semester.semester_number.desc())
+        )
         res2 = await db.execute(stmt2)
         semester = res2.scalar_one_or_none()
     if not semester:
@@ -169,7 +234,9 @@ async def switch_semester(db: AsyncSession, user_id: str, target_semester_id: st
         prof.current_semester_id = target.id
 
     await db.commit()
-    await db.refresh(target)
+    ref_stmt = select(Semester).options(selectinload(Semester.holidays)).where(Semester.id == target.id)
+    ref_res = await db.execute(ref_stmt)
+    target = ref_res.scalar_one()
     return _compute_semester_stats(target)
 
 from app.models.subject import Subject
@@ -225,7 +292,9 @@ async def update_semester(db: AsyncSession, user_id: str, semester_id: str, data
         sem.working_days = data.working_days
 
     await db.commit()
-    await db.refresh(sem)
+    ref_stmt = select(Semester).options(selectinload(Semester.holidays)).where(Semester.id == sem.id)
+    ref_res = await db.execute(ref_stmt)
+    sem = ref_res.scalar_one()
     return _compute_semester_stats(sem)
 
 async def get_setup_status(db: AsyncSession, user_id: str) -> SetupStatusOut:
@@ -322,6 +391,21 @@ async def execute_academic_setup(db: AsyncSession, user_id: str, request: FullAc
             db.add(target_sem)
             await db.flush()
 
+    # Working days & hours
+    w_days = request.working_days
+    if w_days is None and request.start_day and request.end_day:
+        all_days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+        s_idx = all_days.index(request.start_day) if request.start_day in all_days else 0
+        e_idx = all_days.index(request.end_day) if request.end_day in all_days else 5
+        w_days = list(range(min(s_idx, e_idx), max(s_idx, e_idx) + 1))
+    
+    if w_days is not None:
+        target_sem.working_days = w_days
+    if request.class_start_hour is not None:
+        target_sem.class_start_hour = request.class_start_hour
+    if request.class_end_hour is not None:
+        target_sem.class_end_hour = request.class_end_hour
+
     await db.execute(
         update(Semester).where(Semester.user_id == user_id).values(is_active=False)
     )
@@ -416,6 +500,23 @@ async def execute_academic_setup(db: AsyncSession, user_id: str, request: FullAc
         if not sub_obj and "break" in key:
             sub_obj = created_subjects_map.get("break time") or created_subjects_map.get("break")
         if sub_obj:
+            raw_type = (tt_draft.class_type or "").strip().upper()
+            if "LAB" in raw_type or "PRACTICAL" in raw_type:
+                ct = "LAB"
+            elif "THEORY" in raw_type:
+                ct = "THEORY"
+            elif "BREAK" in raw_type or "break" in key:
+                ct = "UNSPECIFIED"
+            elif "OTHER" in raw_type or "UNSPECIFIED" in raw_type:
+                ct = "UNSPECIFIED"
+            else:
+                if "lab" in key or "practical" in key:
+                    ct = "LAB"
+                elif "break" in key:
+                    ct = "UNSPECIFIED"
+                else:
+                    ct = "THEORY"
+
             tt_entry = TimetableEntry(
                 semester_id=target_sem.id,
                 subject_id=sub_obj.id,
@@ -423,7 +524,8 @@ async def execute_academic_setup(db: AsyncSession, user_id: str, request: FullAc
                 start_time=tt_draft.start_time,
                 end_time=tt_draft.end_time,
                 room=tt_draft.room,
-                faculty_name=tt_draft.faculty_name or sub_obj.faculty_name
+                faculty_name=tt_draft.faculty_name or sub_obj.faculty_name,
+                class_type=ct
             )
             db.add(tt_entry)
 
@@ -578,12 +680,23 @@ async def get_academic_setup_data(
                 start_time=t.start_time,
                 end_time=t.end_time,
                 room=t.room,
-                faculty_name=t.faculty_name
+                faculty_name=t.faculty_name,
+                class_type=t.class_type
             ) for t in tt_entries if t.subject_id in subj_id_map
         ]
 
         # Load holidays
-        hol_stmt = select(Holiday).where(Holiday.semester_id == target_sem.id, Holiday.user_id == user_id)
+        hol_stmt = select(Holiday).where(
+            Holiday.user_id == user_id,
+            or_(
+                Holiday.semester_id == target_sem.id,
+                and_(
+                    Holiday.semester_id.is_(None),
+                    Holiday.start_date <= target_sem.end_date,
+                    Holiday.end_date >= target_sem.start_date
+                )
+            )
+        ).order_by(Holiday.start_date.asc())
         hol_res = await db.execute(hol_stmt)
         hols = hol_res.scalars().all()
         hol_drafts = [
@@ -618,12 +731,22 @@ async def get_academic_setup_data(
                     )
                 )
 
+        all_days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+        w_days = target_sem.working_days if target_sem.working_days else [0, 1, 2, 3, 4, 5]
+        s_day = all_days[min(w_days)] if w_days and min(w_days) < len(all_days) else "Monday"
+        e_day = all_days[max(w_days)] if w_days and max(w_days) < len(all_days) else "Saturday"
+
         sem_info = SetupSemesterInfo(
             semester_id=target_sem.id,
             semester_number=target_sem.semester_number,
             semester_label=target_sem.label,
             start_date=target_sem.start_date,
             end_date=target_sem.end_date,
+            working_days=w_days,
+            start_day=s_day,
+            end_day=e_day,
+            class_start_hour=target_sem.class_start_hour or 9,
+            class_end_hour=target_sem.class_end_hour or 16,
             is_existing=True,
             is_active=target_sem.is_active
         )
@@ -637,6 +760,11 @@ async def get_academic_setup_data(
             ),
             start_date=default_start,
             end_date=default_end,
+            working_days=[0, 1, 2, 3, 4, 5],
+            start_day="Monday",
+            end_day="Saturday",
+            class_start_hour=9,
+            class_end_hour=16,
             is_existing=False,
             is_active=False
         )

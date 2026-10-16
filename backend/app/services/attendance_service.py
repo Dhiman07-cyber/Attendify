@@ -170,7 +170,7 @@ async def get_today_sessions(
                 time_status=time_st,
                 attendance_status=att_status,
                 attendance_id=att_id,
-                class_type=cs.class_type or (tt.class_type if tt else None) or "UNSPECIFIED"
+                class_type=cs.class_type or (tt.class_type if tt else None) or "THEORY"
             ))
         else:
             # Virtual session slot (Pure Read - NO DB writes)
@@ -201,7 +201,7 @@ async def get_today_sessions(
                 time_status=time_st,
                 attendance_status=None,
                 attendance_id=None,
-                class_type=tt.class_type or "UNSPECIFIED"
+                class_type=tt.class_type or "THEORY"
             ))
 
     # Add any extra classes or concrete sessions not matched to timetable entries

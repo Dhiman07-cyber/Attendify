@@ -170,6 +170,8 @@ async def confirm_routine_draft(
             db.add(subj)
             await db.flush()
 
+        sub_name_lower = entry.subject_name.lower()
+        ct = "LAB" if ("lab" in sub_name_lower or "practical" in sub_name_lower) else "THEORY"
         tt = TimetableEntry(
             semester_id=payload.semester_id,
             subject_id=subj.id,
@@ -177,7 +179,8 @@ async def confirm_routine_draft(
             start_time=entry.start_time,
             end_time=entry.end_time,
             faculty_name=entry.faculty_name or subj.faculty_name,
-            room=entry.room
+            room=entry.room,
+            class_type=ct
         )
         db.add(tt)
         created_entries += 1

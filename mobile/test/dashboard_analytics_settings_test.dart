@@ -78,6 +78,62 @@ void main() {
     });
 
     testWidgets(
+        'DashboardScreen renders trend chart with single trend point without NaN assertion',
+        (tester) async {
+      final dummyDashboard = DashboardOverviewModel(
+        userName: 'Dev',
+        courseName: 'B.Tech CSE',
+        currentSemesterLabel: '5th Semester',
+        overallPercentage: 78.4,
+        totalAttended: 120,
+        totalConducted: 153,
+        targetPercentage: 75.0,
+        minimumPercentage: 75.0,
+        trendFromLastMonth: 0.0,
+        currentWeek: 12,
+        totalWeeks: 16,
+        weeksRemaining: 4,
+        semesterProgressPct: 75.0,
+        todayDateStr: 'Today, Oct 9',
+        todaySessions: [],
+        subjectsNeedingAttention: [],
+        trendPoints: [
+          TrendPointModel(
+            label: 'Oct',
+            percentage: 78.4,
+            attended: 120,
+            conducted: 153,
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            dashboardProvider.overrideWith((ref) => dummyDashboard),
+            selectedDateAttendanceProvider.overrideWith(
+              (ref) => SelectedDateAttendanceNotifier(null, null, null, false),
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.lightTheme,
+            home: DashboardScreen(
+              onOpenDrawer: () {},
+              onNavigateToToday: () {},
+              onNavigateToAnalytics: () {},
+              onNavigateToCalendar: () {},
+              onNavigateToProfile: () {},
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.byType(CustomPaint), findsWidgets);
+    });
+
+    testWidgets(
         'AnalyticsScreen tabs are interactive and switch content smoothly',
         (tester) async {
       final dummyAnalytics = AnalyticsOverviewModel(

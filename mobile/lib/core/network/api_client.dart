@@ -35,15 +35,41 @@ class ApiClient {
         } else if (token == 'demo_token') {
           await _storage.clearAuth();
         }
-        debugPrint('[API REQ] ${options.method} ${options.baseUrl}${options.path}');
+
+        final path = options.path;
+        final isAuthEndpoint = path.contains('/auth/login') ||
+            path.contains('/auth/register') ||
+            path.contains('/auth/google') ||
+            path.contains('/auth/refresh') ||
+            path.contains('/auth/forgot-password') ||
+            path.contains('/auth/reset-password');
+
+        if (!isAuthEndpoint && (token == null || token.isEmpty || token == 'demo_token')) {
+          if (kDebugMode) {
+            debugPrint('[API BLOCKED] Prevented unauthenticated request while logged out: $path');
+          }
+          return handler.reject(DioException(
+            requestOptions: options,
+            type: DioExceptionType.cancel,
+            message: 'User is not authenticated.',
+          ));
+        }
+
+        if (kDebugMode) {
+          debugPrint('[API REQ] ${options.method} ${options.baseUrl}${options.path}');
+        }
         return handler.next(options);
       },
       onResponse: (response, handler) {
-        debugPrint('[API RES] ${response.statusCode} ${response.requestOptions.path}');
+        if (kDebugMode) {
+          debugPrint('[API RES] ${response.statusCode} ${response.requestOptions.path}');
+        }
         return handler.next(response);
       },
       onError: (DioException error, handler) async {
-        debugPrint('[API ERR] ${error.response?.statusCode} ${error.requestOptions.path}: ${error.message}');
+        if (kDebugMode) {
+          debugPrint('[API ERR] ${error.response?.statusCode} ${error.requestOptions.path}: ${error.message}');
+        }
         final path = error.requestOptions.path;
         final isAuthEndpoint = path.contains('/auth/login') ||
             path.contains('/auth/register') ||

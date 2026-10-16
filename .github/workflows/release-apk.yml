@@ -154,6 +154,7 @@ jobs:
             printf 'flutter.sdk=%s\n' "$FLUTTER_SDK" > android/local.properties
             gradle -p android wrapper --gradle-version 8.12
           fi
+          chmod +x android/gradlew
 
       - name: Install Flutter dependencies
         working-directory: mobile
@@ -166,6 +167,17 @@ jobs:
       - name: Analyze Flutter project
         working-directory: mobile
         run: flutter analyze --no-fatal-infos
+
+      - name: Verify Signing Keystore & Print Fingerprints
+        working-directory: mobile
+        shell: bash
+        run: |
+          echo "=== Keystore Verification ==="
+          if [ -f android/app/upload-keystore.jks ]; then
+            keytool -list -v -keystore android/app/upload-keystore.jks -alias attendhub -storepass android | grep -E "SHA1|SHA256" || true
+          else
+            echo "Warning: upload-keystore.jks not found. Building with debug fallback."
+          fi
 
       - name: Build Release APK
         working-directory: mobile

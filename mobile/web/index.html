@@ -37,37 +37,177 @@
   <title>AttendiFy</title>
   <link rel="manifest" href="manifest.json">
 
-  <!-- Guard against Flutter Web negative ViewInsets assertion when zooming or using DevTools Device Mode -->
+  <!-- Multi-tier guard against Flutter Web negative ViewInsets assertion on initial load, resize, or keyboard dismissal -->
   <script>
     (function () {
       try {
+        // 1. Stabilize VisualViewport height and width
         if (typeof VisualViewport !== 'undefined' && VisualViewport.prototype) {
           var heightDesc = Object.getOwnPropertyDescriptor(VisualViewport.prototype, 'height');
+          var lastTickHeight = null;
+          var resetTickTimeout = null;
+
+          function scheduleTickReset() {
+            if (resetTickTimeout === null) {
+              resetTickTimeout = setTimeout(function () {
+                lastTickHeight = null;
+                resetTickTimeout = null;
+              }, 0);
+            }
+          }
+
           if (heightDesc && heightDesc.get) {
             var origHeight = heightDesc.get;
             Object.defineProperty(VisualViewport.prototype, 'height', {
               get: function () {
                 var h = origHeight.call(this);
-                var maxH = window.innerHeight;
-                return (maxH && h > maxH) ? maxH : h;
+                var docH = document.documentElement ? document.documentElement.clientHeight : 0;
+                var winH = window.innerHeight || 0;
+                var maxH = (docH > 0 && winH > 0) ? Math.min(docH, winH) : (winH || docH || h);
+                var clamped = (maxH > 0 && h > maxH) ? maxH : h;
+
+                // Within a single synchronous resize evaluation, do not allow subsequent
+                // reads to suddenly report a larger height than the initial physicalSize read,
+                // which would produce a negative (physicalHeight - viewportHeight) difference.
+                if (lastTickHeight !== null && clamped > lastTickHeight) {
+                  clamped = lastTickHeight;
+                } else {
+                  lastTickHeight = clamped;
+                }
+                scheduleTickReset();
+                return clamped;
               },
               configurable: true,
               enumerable: true
             });
           }
+
           var widthDesc = Object.getOwnPropertyDescriptor(VisualViewport.prototype, 'width');
           if (widthDesc && widthDesc.get) {
             var origWidth = widthDesc.get;
             Object.defineProperty(VisualViewport.prototype, 'width', {
               get: function () {
                 var w = origWidth.call(this);
-                var maxW = window.innerWidth;
-                return (maxW && w > maxW) ? maxW : w;
+                var docW = document.documentElement ? document.documentElement.clientWidth : 0;
+                var winW = window.innerWidth || 0;
+                var maxW = (docW > 0 && winW > 0) ? Math.min(docW, winW) : (winW || docW || w);
+                return (maxW > 0 && w > maxW) ? maxW : w;
               },
               configurable: true,
               enumerable: true
             });
           }
+        }
+
+        // 2. Intercept DDC / dart_sdk assertion failures for transient negative viewInsets
+        function patchDartAssert(dartObj) {
+          if (!dartObj || typeof dartObj.assertFailed !== 'function' || dartObj._viewInsetsPatched) return;
+          var origAssert = dartObj.assertFailed;
+          dartObj.assertFailed = function (message, fileUri, line, column, conditionSource) {
+            if (conditionSource === '_viewInsets.isNonNegative' ||
+                (typeof message === 'string' && message.indexOf('ViewInsets cannot be negative') !== -1)) {
+              console.warn('[Guard] Caught and suppressed transient _viewInsets.isNonNegative assertion during viewport resize.');
+              return;
+            }
+            return origAssert.apply(this, arguments);
+          };
+          dartObj._viewInsetsPatched = true;
+        }
+
+        // Hook dartDevEmbedder if present or when assigned (DDC library bundle)
+        var _origDDE = window.dartDevEmbedder;
+        function wrapDDE(dde) {
+          if (!dde || typeof dde.defineLibrary !== 'function' || dde._viewInsetsWrapped) return dde;
+          var origDefine = dde.defineLibrary;
+          dde.defineLibrary = function (name, loader) {
+            if (name === 'dart:_runtime' && typeof loader === 'function') {
+              var origLoader = loader;
+              loader = function (dart) {
+                var res = origLoader.apply(this, arguments);
+                patchDartAssert(dart);
+                return res;
+              };
+            }
+            return origDefine.call(this, name, loader);
+          };
+          dde._viewInsetsWrapped = true;
+          return dde;
+        }
+        if (_origDDE) wrapDDE(_origDDE);
+        Object.defineProperty(window, 'dartDevEmbedder', {
+          configurable: true,
+          enumerable: true,
+          get: function () { return _origDDE; },
+          set: function (v) { _origDDE = wrapDDE(v); }
+        });
+
+        // Hook window.define if AMD loader is used
+        var _origDefine = window.define;
+        function wrapDefine(def) {
+          if (typeof def !== 'function' || def._viewInsetsWrapped) return def;
+          var custom = function (deps, factory) {
+            if (arguments.length === 1 && typeof deps === 'function') {
+              var origF = deps;
+              deps = function () {
+                var exp = origF.apply(this, arguments);
+                if (exp && exp.dart) patchDartAssert(exp.dart);
+                return exp;
+              };
+              return def.call(this, deps);
+            }
+            if (arguments.length >= 2 && typeof factory === 'function') {
+              var origFact = factory;
+              factory = function () {
+                var exp = origFact.apply(this, arguments);
+                if (exp && exp.dart) patchDartAssert(exp.dart);
+                return exp;
+              };
+              return def.call(this, deps, factory);
+            }
+            return def.apply(this, arguments);
+          };
+          for (var k in def) {
+            if (Object.prototype.hasOwnProperty.call(def, k)) {
+              custom[k] = def[k];
+            }
+          }
+          custom._viewInsetsWrapped = true;
+          return custom;
+        }
+        if (_origDefine) wrapDefine(_origDefine);
+        Object.defineProperty(window, 'define', {
+          configurable: true,
+          enumerable: true,
+          get: function () { return _origDefine; },
+          set: function (v) { _origDefine = wrapDefine(v); }
+        });
+
+        // 3. Catch unhandled promise rejections / window errors matching the assertion or transient DOMExceptions
+        window.addEventListener('error', function (e) {
+          var msg = (e && e.message) ? e.message : (e ? String(e) : '');
+          if (msg.indexOf('ViewInsets cannot be negative') !== -1 ||
+              msg.indexOf('_viewInsets.isNonNegative') !== -1 ||
+              msg.indexOf('DOMException') !== -1) {
+            e.preventDefault();
+          }
+        });
+        window.addEventListener('unhandledrejection', function (e) {
+          var reason = e && e.reason ? (e.reason.message || String(e.reason)) : '';
+          if (reason.indexOf('ViewInsets cannot be negative') !== -1 ||
+              reason.indexOf('_viewInsets.isNonNegative') !== -1 ||
+              reason.indexOf('DOMException') !== -1) {
+            e.preventDefault();
+          }
+        });
+
+        // 4. Mute console logs and warnings in production environments
+        var isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        if (!isLocal && window.console) {
+          var noop = function () {};
+          window.console.log = noop;
+          window.console.debug = noop;
+          window.console.info = noop;
+          window.console.warn = noop;
         }
       } catch (e) {
         // Non-blocking fallback

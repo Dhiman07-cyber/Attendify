@@ -5,6 +5,9 @@ import 'package:attendhub/core/theme/app_theme.dart';
 import 'package:attendhub/features/today/today_screen.dart';
 import 'package:attendhub/features/today/providers/today_provider.dart';
 
+import 'package:attendhub/shared/models/semester_model.dart';
+import 'package:attendhub/shared/providers/semesters_provider.dart';
+
 class FakeTodayNotifier extends TodayNotifier {
   final TodayState fakeState;
 
@@ -16,6 +19,19 @@ class FakeTodayNotifier extends TodayNotifier {
   Future<void> loadToday({int? offset}) async {
     // No-op for tests
   }
+}
+
+class FakeSemestersNotifier extends StateNotifier<SemestersState> implements SemestersNotifier {
+  FakeSemestersNotifier(super.state);
+
+  @override
+  void clear() {}
+
+  @override
+  Future<void> loadSemesters() async {}
+
+  @override
+  Future<bool> switchSemester(String semesterId) async => true;
 }
 
 void main() {
@@ -77,10 +93,12 @@ void main() {
     weekEndDateStr: '2026-10-18',
   );
 
-  Widget createTestWidget({TodayState? state}) {
+  Widget createTestWidget({TodayState? state, SemestersState? semestersState}) {
     return ProviderScope(
       overrides: [
         todayProvider.overrideWith((ref) => FakeTodayNotifier(state ?? dummyTodayState)),
+        if (semestersState != null)
+          semestersProvider.overrideWith((ref) => FakeSemestersNotifier(semestersState)),
       ],
       child: MaterialApp(
         theme: AppTheme.lightTheme,
@@ -198,6 +216,113 @@ void main() {
 
       await tester.pumpWidget(createTestWidget());
       expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('RoutineScreen completely omits "No more classes scheduled for today" card when no class is live or next', (tester) async {
+      final emptyState = TodayState(
+        isLoading: false,
+        dateStr: 'Tuesday, 13 Oct 2026',
+        semesterLabel: '5th Semester',
+        sessions: [],
+        timetableEntries: [],
+        weekStartDateStr: '2026-10-12',
+        weekEndDateStr: '2026-10-18',
+      );
+      await tester.pumpWidget(createTestWidget(state: emptyState));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('No more classes scheduled for today'), findsNothing);
+    });
+
+    testWidgets('TodayScreen respects activeSemester Mon-Fri working_days: Saturday and Sunday are NOT rendered in grid', (tester) async {
+      final monFriSemester = SemesterModel(
+        id: 'sem-mon-fri',
+        userId: 'user-1',
+        semesterNumber: 1,
+        label: '1st Semester',
+        startDate: '2026-08-01',
+        endDate: '2026-12-15',
+        status: 'ACTIVE',
+        isActive: true,
+        totalWeeks: 16,
+        currentWeek: 8,
+        weeksRemaining: 8,
+        progressPercentage: 50.0,
+        workingDays: [0, 1, 2, 3, 4], // Mon to Fri
+        classStartHour: 9,
+        classEndHour: 16,
+      );
+
+      await tester.pumpWidget(createTestWidget(
+        semestersState: SemestersState(semesters: [monFriSemester]),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('MON'), findsOneWidget);
+      expect(find.text('TUE'), findsOneWidget);
+      expect(find.text('WED'), findsOneWidget);
+      expect(find.text('THU'), findsOneWidget);
+      expect(find.text('FRI'), findsOneWidget);
+      expect(find.text('SAT'), findsNothing);
+      expect(find.text('SUN'), findsNothing);
+    });
+
+    testWidgets('TodayScreen displays Saturday when activeSemester working_days includes Saturday ([0, 1, 2, 3, 4, 5])', (tester) async {
+      final monSatSemester = SemesterModel(
+        id: 'sem-mon-sat',
+        userId: 'user-1',
+        semesterNumber: 1,
+        label: '1st Semester',
+        startDate: '2026-08-01',
+        endDate: '2026-12-15',
+        status: 'ACTIVE',
+        isActive: true,
+        totalWeeks: 16,
+        currentWeek: 8,
+        weeksRemaining: 8,
+        progressPercentage: 50.0,
+        workingDays: [0, 1, 2, 3, 4, 5], // Mon to Sat
+        classStartHour: 9,
+        classEndHour: 16,
+      );
+
+      await tester.pumpWidget(createTestWidget(
+        semestersState: SemestersState(semesters: [monSatSemester]),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('MON'), findsOneWidget);
+      expect(find.text('SAT'), findsOneWidget);
+      expect(find.text('SUN'), findsNothing);
+    });
+
+    testWidgets('TodayScreen respects activeSemester classStartHour and classEndHour', (tester) async {
+      final customHoursSemester = SemesterModel(
+        id: 'sem-hours',
+        userId: 'user-1',
+        semesterNumber: 1,
+        label: '1st Semester',
+        startDate: '2026-08-01',
+        endDate: '2026-12-15',
+        status: 'ACTIVE',
+        isActive: true,
+        totalWeeks: 16,
+        currentWeek: 8,
+        weeksRemaining: 8,
+        progressPercentage: 50.0,
+        workingDays: [0, 1, 2, 3, 4],
+        classStartHour: 8,
+        classEndHour: 14,
+      );
+
+      await tester.pumpWidget(createTestWidget(
+        semestersState: SemestersState(semesters: [customHoursSemester]),
+      ));
+      await tester.pumpAndSettle();
+
+      // Hours 8 AM through 1 PM
+      expect(find.text('8 AM'), findsOneWidget);
+      expect(find.text('1 PM'), findsOneWidget);
     });
   });
 }

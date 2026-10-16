@@ -66,6 +66,18 @@ async def create_timetable_entry(db: AsyncSession, user_id: str, data: Timetable
     if not subj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subject not found.")
 
+    raw_type = (data.class_type or "").strip().upper()
+    if "LAB" in raw_type or "PRACTICAL" in raw_type:
+        ct = "LAB"
+    elif "THEORY" in raw_type:
+        ct = "THEORY"
+    elif "OTHER" in raw_type or "UNSPECIFIED" in raw_type:
+        ct = "UNSPECIFIED"
+    elif data.class_type:
+        ct = "UNSPECIFIED"
+    else:
+        ct = "LAB" if ("lab" in subj.name.lower() or "practical" in subj.name.lower()) else "THEORY"
+
     entry = TimetableEntry(
         semester_id=subj.semester_id,
         subject_id=data.subject_id,
@@ -75,7 +87,8 @@ async def create_timetable_entry(db: AsyncSession, user_id: str, data: Timetable
         faculty_name=data.faculty_name or subj.faculty_name,
         room=data.room,
         effective_from=data.effective_from,
-        effective_to=data.effective_to
+        effective_to=data.effective_to,
+        class_type=ct
     )
     db.add(entry)
     await db.commit()

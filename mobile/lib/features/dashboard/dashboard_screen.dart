@@ -52,10 +52,19 @@ class DashboardScreen extends ConsumerWidget {
           }
           return _buildDashboardSkeleton(context);
         },
-        error: (err, stack) => ErrorRetryView(
-          message: err.toString(),
-          onRetry: () => ref.refresh(dashboardProvider),
-        ),
+        error: (err, stack) {
+          final errStr = err.toString();
+          if (errStr.contains('not authenticated') || errStr.contains('User is not authenticated')) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              ref.invalidate(dashboardProvider);
+            });
+            return _buildDashboardSkeleton(context);
+          }
+          return ErrorRetryView(
+            message: err.toString(),
+            onRetry: () => ref.refresh(dashboardProvider),
+          );
+        },
         data: (data) => _buildDashboardContent(context, ref, data),
       ),
     );
@@ -902,12 +911,16 @@ class DashboardScreen extends ConsumerWidget {
                         ? CustomPaint(
                             painter: _TrendChartPainter(
                               points: data.trendPoints
-                                  .map<double>((tp) =>
-                                      ((tp.percentage ?? 0.0) / 100.0)
-                                          .clamp(0.0, 1.0))
+                                  .map<double>((tp) {
+                                    final p = tp.percentage;
+                                    if (p == null || p.isNaN) return 0.0;
+                                    return (p / 100.0).clamp(0.0, 1.0);
+                                  })
                                   .toList(),
-                              targetThreshold:
-                                  (data.targetPercentage / 100.0).clamp(0.0, 1.0),
+                              targetThreshold: (data.targetPercentage.isNaN
+                                      ? 75.0
+                                      : data.targetPercentage / 100.0)
+                                  .clamp(0.0, 1.0),
                             ),
                           )
                         : const Center(
@@ -1967,7 +1980,9 @@ class DashboardScreen extends ConsumerWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
-              value: ((item.percentage ?? 0) / 100.0).clamp(0.0, 1.0),
+              value: (item.percentage == null || item.percentage!.isNaN
+                  ? 0.0
+                  : (item.percentage! / 100.0).clamp(0.0, 1.0)),
               backgroundColor: const Color(0xFFFBECE9),
               valueColor: AlwaysStoppedAnimation<Color>(
                 item.status == 'CRITICAL' ? AppColors.coral : AppColors.amber,
@@ -1994,7 +2009,11 @@ class _TrendChartPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (points.isEmpty) return;
+    if (points.isEmpty || size.width <= 0 || size.height <= 0) return;
+
+    final safeTargetThreshold = targetThreshold.isNaN
+        ? 0.75
+        : targetThreshold.clamp(0.0, 1.0);
 
     final paintLine = Paint()
       ..color = AppColors.coral
@@ -2017,12 +2036,39 @@ class _TrendChartPainter extends CustomPainter {
       ..style = PaintingStyle.stroke;
 
     // Draw Target Dotted Line
-    final targetY = size.height * (1.0 - targetThreshold);
+    final targetY = size.height * (1.0 - safeTargetThreshold);
     double startX = 0;
     while (startX < size.width) {
       canvas.drawLine(
           Offset(startX, targetY), Offset(startX + 6, targetY), dottedTarget);
       startX += 10;
+    }
+
+    if (points.length == 1) {
+      final pointVal = points[0].isNaN ? 0.0 : points[0].clamp(0.0, 1.0);
+      final y = size.height * (1.0 - (pointVal * 0.9));
+      final x = size.width / 2;
+
+      // Draw horizontal line representing this level
+      final singleLine = Paint()
+        ..color = AppColors.coral.withValues(alpha: 0.5)
+        ..strokeWidth = 1.8
+        ..style = PaintingStyle.stroke;
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), singleLine);
+
+      // Fill area under line
+      final fillPath = Path()
+        ..moveTo(0, size.height)
+        ..lineTo(0, y)
+        ..lineTo(size.width, y)
+        ..lineTo(size.width, size.height)
+        ..close();
+      canvas.drawPath(fillPath, paintFill);
+
+      // Draw point circle safely
+      canvas.drawCircle(Offset(x, y), 3.5, Paint()..color = Colors.white);
+      canvas.drawCircle(Offset(x, y), 2.5, Paint()..color = AppColors.coral);
+      return;
     }
 
     // Path for curve
@@ -2032,16 +2078,19 @@ class _TrendChartPainter extends CustomPainter {
     final stepX = size.width / (points.length - 1);
 
     for (int i = 0; i < points.length; i++) {
+      final pointVal = points[i].isNaN ? 0.0 : points[i].clamp(0.0, 1.0);
       final x = i * stepX;
-      final y = size.height * (1.0 - (points[i] * 0.9));
+      final y = size.height * (1.0 - (pointVal * 0.9));
 
       if (i == 0) {
         path.moveTo(x, y);
         fillPath.moveTo(x, size.height);
         fillPath.lineTo(x, y);
       } else {
+        final prevPointVal =
+            points[i - 1].isNaN ? 0.0 : points[i - 1].clamp(0.0, 1.0);
         final prevX = (i - 1) * stepX;
-        final prevY = size.height * (1.0 - (points[i - 1] * 0.9));
+        final prevY = size.height * (1.0 - (prevPointVal * 0.9));
         final cX1 = prevX + (x - prevX) / 2;
         final cY1 = prevY;
         final cX2 = prevX + (x - prevX) / 2;
@@ -2051,8 +2100,10 @@ class _TrendChartPainter extends CustomPainter {
       }
 
       // Draw point circle
-      canvas.drawCircle(Offset(x, y), 3.5, Paint()..color = Colors.white);
-      canvas.drawCircle(Offset(x, y), 2.5, Paint()..color = AppColors.coral);
+      if (!x.isNaN && !y.isNaN) {
+        canvas.drawCircle(Offset(x, y), 3.5, Paint()..color = Colors.white);
+        canvas.drawCircle(Offset(x, y), 2.5, Paint()..color = AppColors.coral);
+      }
     }
 
     fillPath.lineTo(size.width, size.height);

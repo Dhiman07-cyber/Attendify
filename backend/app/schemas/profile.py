@@ -70,6 +70,7 @@ class SetupTimetableDraft(BaseModel):
     end_time: Optional[str] = None
     room: Optional[str] = None
     faculty_name: Optional[str] = None
+    class_type: Optional[str] = None
 
     @field_validator("day_of_week", mode="before")
     @classmethod
@@ -133,6 +134,11 @@ class FullAcademicSetupRequest(BaseModel):
     semester_label: Optional[str] = Field("1st Semester", max_length=100)
     start_date: date
     end_date: date
+    working_days: Optional[List[int]] = None
+    start_day: Optional[str] = None
+    end_day: Optional[str] = None
+    class_start_hour: Optional[int] = 9
+    class_end_hour: Optional[int] = 16
     minimum_attendance: float = Field(75.0, ge=0.0, le=100.0)
     personal_target: float = Field(75.0, ge=0.0, le=100.0)
     low_attendance_alert: float = Field(70.0, ge=0.0, le=100.0)
@@ -176,6 +182,11 @@ class SetupSemesterInfo(BaseModel):
     semester_label: str
     start_date: date
     end_date: date
+    working_days: List[int] = Field(default=[0, 1, 2, 3, 4, 5])
+    start_day: str = "Monday"
+    end_day: str = "Saturday"
+    class_start_hour: int = 9
+    class_end_hour: int = 16
     is_existing: bool
     is_active: bool = False
 

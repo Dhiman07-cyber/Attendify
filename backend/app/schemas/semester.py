@@ -58,6 +58,8 @@ class SemesterOut(BaseModel):
     is_active: bool
     total_weeks: int
     working_days: List[int] = Field(default=[0,1,2,3,4,5])
+    class_start_hour: int = 9
+    class_end_hour: int = 16
     current_week: int = 1
     weeks_remaining: int = 0
     progress_percentage: float = 0.0

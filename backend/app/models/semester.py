@@ -68,6 +68,8 @@ class Semester(Base):
         nullable=True,
         default=None
     )  # Stores [0,1,2,3,4,5] where 0=Mon, 6=Sun
+    class_start_hour: Mapped[int] = mapped_column(Integer, default=9, nullable=True)
+    class_end_hour: Mapped[int] = mapped_column(Integer, default=16, nullable=True)
     
     # Relationships
     user = relationship("User", back_populates="semesters")

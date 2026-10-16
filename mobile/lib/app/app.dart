@@ -249,6 +249,23 @@ class _AttendHubAppState extends ConsumerState<AttendHubApp> {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       scrollBehavior: const SmoothScrollBehavior(),
+      builder: (context, child) {
+        final mq = MediaQuery.of(context);
+        final insets = mq.viewInsets;
+        if (insets.left < 0 || insets.top < 0 || insets.right < 0 || insets.bottom < 0) {
+          final sanitized = EdgeInsets.fromLTRB(
+            insets.left < 0 ? 0.0 : insets.left,
+            insets.top < 0 ? 0.0 : insets.top,
+            insets.right < 0 ? 0.0 : insets.right,
+            insets.bottom < 0 ? 0.0 : insets.bottom,
+          );
+          return MediaQuery(
+            data: mq.copyWith(viewInsets: sanitized),
+            child: child ?? const SizedBox.shrink(),
+          );
+        }
+        return child ?? const SizedBox.shrink();
+      },
       home: Builder(
         builder: (context) {
           if (authState.isInitialChecking && !authState.isAuthenticated) {
