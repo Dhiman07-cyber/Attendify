@@ -137,7 +137,7 @@ jobs:
           HEALTH_URL: ${{ steps.params.outputs.health_url }}
         run: |
           echo "Waiting for Render to build and deploy... Checking: $HEALTH_URL"
-          MAX_ATTEMPTS=30
+          MAX_ATTEMPTS=60
           INTERVAL=10
           ATTEMPT=1
           SUCCESS=0

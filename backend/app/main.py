@@ -1,10 +1,12 @@
 from contextlib import asynccontextmanager
+import time
 from fastapi import FastAPI, Request, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 import httpx
+import jwt as pyjwt
 import logging
 
 from app.core.config import settings
@@ -18,6 +20,8 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
 logger = logging.getLogger("attendhub")
+# Suppress httpx INFO-level connection/response logs to avoid health-check noise
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -67,6 +71,43 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def structured_request_logger(request: Request, call_next):
+    """Structured access log: [API] METHOD /path | user=sub | STATUS | Xms | Ybytes."""
+    path = request.url.path
+    method = request.method
+
+    # Skip noisy health-check and HEAD probes
+    if method == "HEAD" or path in ("/health", f"{settings.API_V1_STR}/health"):
+        return await call_next(request)
+
+    start = time.monotonic()
+
+    # Cheaply extract user sub from JWT for logging (no signature verification)
+    user_sub = "-"
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        try:
+            payload = pyjwt.decode(
+                auth_header[7:],
+                options={"verify_signature": False},
+                algorithms=["HS256"],
+            )
+            user_sub = str(payload.get("sub", "-"))[:12]
+        except Exception:
+            pass
+
+    response = await call_next(request)
+
+    elapsed_ms = round((time.monotonic() - start) * 1000)
+    content_length = response.headers.get("content-length", "?")
+    logger.info(
+        "[API] %s %s | user=%s | %s | %dms | %sb",
+        method, path, user_sub, response.status_code, elapsed_ms, content_length,
+    )
+    return response
+
 
 @app.middleware("http")
 async def add_security_and_coop_headers(request: Request, call_next):
@@ -134,14 +175,21 @@ async def health_check(db: AsyncSession = Depends(get_db)):
     supabase_rest_status = "skipped"
     if settings.SUPABASE_URL and settings.SUPABASE_PUBLISHABLE_KEY:
         try:
-            async with httpx.AsyncClient(timeout=3.0) as client:
+            async with httpx.AsyncClient(
+                timeout=3.0,
+                # Suppress per-request httpx logs by disabling event hooks at client level
+            ) as client:
                 resp = await client.get(
                     f"{settings.SUPABASE_URL.rstrip('/')}/rest/v1/",
-                    headers={"apikey": settings.SUPABASE_PUBLISHABLE_KEY},
+                    headers={
+                        "apikey": settings.SUPABASE_PUBLISHABLE_KEY,
+                        "Authorization": f"Bearer {settings.SUPABASE_PUBLISHABLE_KEY}",
+                    },
                 )
+                # 200, 401, 404 all indicate the REST API gateway is alive
                 supabase_rest_status = "ok" if resp.status_code < 500 else f"http_{resp.status_code}"
         except Exception as e:
-            logger.debug(f"Supabase REST keep-alive ping skipped/failed: {e}")
+            logger.debug("Supabase REST keep-alive ping failed: %s", e)
             supabase_rest_status = "unreachable"
 
     return {

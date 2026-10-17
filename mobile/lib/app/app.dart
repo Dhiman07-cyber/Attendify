@@ -12,12 +12,6 @@ import '../features/holidays/holidays_screen.dart';
 import '../features/analytics/analytics_screen.dart';
 import '../features/profile/profile_screen.dart';
 import '../features/profile/providers/profile_provider.dart';
-import '../features/dashboard/providers/dashboard_provider.dart';
-import '../features/today/providers/today_provider.dart';
-import '../features/subjects/providers/subjects_provider.dart';
-import '../features/calendar/providers/calendar_provider.dart';
-import '../features/analytics/providers/analytics_provider.dart';
-import '../features/holidays/providers/holidays_provider.dart';
 import '../features/settings/settings_screen.dart';
 import '../features/onboarding/onboarding_screen.dart';
 import '../features/auth/auth_screen.dart';
@@ -552,15 +546,10 @@ class _AttendHubAppState extends ConsumerState<AttendHubApp> {
     } else if (_secondaryRoute == 'setup') {
       return AcademicSetupScreen(
         onComplete: () {
+          // setup_provider.commitSetup() already invalidated all data providers.
+          // Re-check setup status and reload semester list to refresh the UI.
           ref.read(setupProvider.notifier).checkStatus();
-          ref.invalidate(dashboardProvider);
-          ref.invalidate(todayProvider);
-          ref.invalidate(subjectsProvider);
-          ref.invalidate(calendarProvider);
-          ref.invalidate(analyticsProvider);
-          ref.invalidate(holidaysProvider);
-          ref.invalidate(profileProvider);
-          ref.invalidate(semestersProvider);
+          ref.read(semestersProvider.notifier).loadSemesters();
           _setNavState(clearSecondary: true);
         },
         onCancel: () => _setNavState(clearSecondary: true),

@@ -12,13 +12,6 @@ import '../../shared/widgets/liquid_glass_card.dart';
 import '../../shared/widgets/app_toast.dart';
 import '../../shared/widgets/shimmer_skeleton.dart';
 import '../auth/providers/auth_provider.dart';
-import '../dashboard/providers/dashboard_provider.dart';
-import '../today/providers/today_provider.dart';
-import '../subjects/providers/subjects_provider.dart';
-import '../calendar/providers/calendar_provider.dart';
-import '../analytics/providers/analytics_provider.dart';
-import '../holidays/providers/holidays_provider.dart';
-import '../profile/providers/profile_provider.dart';
 import '../../shared/providers/semesters_provider.dart';
 import '../../core/theme/time_format_provider.dart';
 import 'providers/setup_provider.dart';
@@ -1377,14 +1370,8 @@ class _AcademicSetupScreenState extends ConsumerState<AcademicSetupScreen>
       if (success) {
         _isCommitted = true;
         await _clearDraft();
-        ref.invalidate(dashboardProvider);
-        ref.invalidate(todayProvider);
-        ref.invalidate(subjectsProvider);
-        ref.invalidate(calendarProvider);
-        ref.invalidate(analyticsProvider);
-        ref.invalidate(holidaysProvider);
-        ref.invalidate(profileProvider);
-        ref.invalidate(semestersProvider);
+        // All provider invalidations are handled by setup_provider.commitSetup().
+        // Do not duplicate here — it causes a 5x dashboard request storm.
         widget.onComplete();
       } else {
         setState(() {
